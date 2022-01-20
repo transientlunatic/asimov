@@ -23,9 +23,9 @@ authors:
     - name: "Avi Vajpeji"
       orcid: 0000-0002-4146-1132
       affiliation: "2, 3"
-    - name: "Charlie "
-      orcid: 0000-0002-4146-1132
-      affiliation: "2, 3"
+    - name: "Charlie Hoy"
+      orcid: 0000-0002-8843-6719
+      affiliation: 7
 affiliations:
     - name: "School of Physics and Astronomy, University of Glasgow, Glasgow, G12 8QQ, United Kingdom"
       index: 1
@@ -39,6 +39,8 @@ affiliations:
       index: 5
     - name: "School of Physics and Astronomy and Institute for Gravitational Wave Astronomy, University of Birmingham, Edgbaston, Birmingham, B15 9TT, United Kingdom"
       index: 6
+    - name: "Cardiff University, Cardiff CF24 3AA, UK"
+	  index: 7
 date: 17 December 2021
 bibliography: paper.bib
 
