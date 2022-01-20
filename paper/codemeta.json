@@ -1,0 +1,17 @@
+{
+  "@context": "https://raw.githubusercontent.com/codemeta/codemeta/master/codemeta.jsonld",
+  "@type": "Code",
+  "author": [
+
+  ],
+  "identifier": "https://doi.org/10.5281/zenodo.4024432",
+  "codeRepository": "https://github.com/transientlunatic/asimov",
+  "datePublished": "2022-01-20",
+  "dateModified": "2022-01-20",
+  "dateCreated": "2022-01-20",
+  "description": "Asimov is a workflow management and automation platform for scientific analyses.",
+  "keywords": "gravitational waves, ligo, virgo, automation, data analysis",
+  "license": "ISC",
+  "title": "asimov",
+  "version": "0.3.2"
+}
