@@ -22,17 +22,22 @@ Project analyses
   This type of analysis is useful for defining a population analysis, for example.
 
 """
+
+import glob
+import pathlib
 import os
 import configparser
 from copy import deepcopy
-from warnings import warn
 
 from liquid import Liquid
 
-from asimov import config
+from asimov import config, logger, LOGGER_LEVEL
 from asimov.pipelines import known_pipelines
-from asimov.utils import update
 from asimov.storage import Store
+from asimov.exceptions import DescriptionException
+from asimov.utils import update, diff_dict
+from .ini import RunConfiguration
+from .review import Review
 
 
 class Analysis:
@@ -42,11 +47,11 @@ class Analysis:
     TODO: Add a check to make sure names cannot conflict
     """
 
-    @property
-    def review(self):
-        """
-        Return the review information attached to the analysis.
-        """
+    # @property
+    # def review(self):
+    #     """
+    #     Return the review information attached to the analysis.
+    #     """
 
     def _process_dependencies(self, needs):
         """
@@ -72,7 +77,7 @@ class Analysis:
 
             if "status" not in parameters:
                 parameters["status"] = "ready"
-
+                
             return cls(event=event, **parameters)
 
         if "comment" not in pars:
@@ -82,14 +87,87 @@ class Analysis:
 
         return cls(event, name, **pars)
 
-    
-    @property
-    def priors(self):
+    def to_dict(self, event=True):
+        """
+        Return this production as a dictionary.
+
+        Parameters
+        ----------
+        event : bool
+           If set to True the output is designed to be included nested within an event.
+           The event name is not included in the representation, and the production name is provided as a key.
+        """
+        dictionary = deepcopy(self.meta)
+        if not event:
+            dictionary["event"] = self.event.name
+            dictionary["name"] = self.name
+
+        dictionary["status"] = self.status
+        dictionary["pipeline"] = self.pipeline.name.lower()
+        dictionary["comment"] = self.comment
+
+        dictionary["review"] = self.review.to_dicts()
+
+        if "data" in self.meta:
+            dictionary["data"] = self.meta["data"]
+        if "likelihood" in self.meta:
+            dictionary["likelihood"] = self.meta["likelihood"]
+        if "quality" in self.meta:
+            dictionary["quality"] = self.meta["quality"]
         if "priors" in self.meta:
-            priors = self.meta["priors"]
+            dictionary["priors"] = self.meta["priors"]
+        if "waveform" in self.meta:
+            dictionary["waveform"] = self.meta["waveform"]
+        dictionary["needs"] = self.dependencies
+        dictionary["job id"] = self.job_id
+
+        # Remove duplicates of pipeline defaults
+        if self.pipeline.name.lower() in self.event.ledger.data["pipelines"]:
+            defaults = deepcopy(
+                self.event.ledger.data["pipelines"][self.pipeline.name.lower()]
+            )
         else:
-            priors = None
-        return priors
+            defaults = {}
+
+        if "postprocessing" in self.event.ledger.data:
+            defaults["postprocessing"] = deepcopy(
+                self.event.ledger.data["postprocessing"]
+            )
+
+        if "ledger" in self.event.meta:
+            self.event.meta.pop("ledger")
+
+        defaults = update(defaults, deepcopy(self.event.meta))
+
+        dictionary = diff_dict(defaults, dictionary)
+
+        for key, value in self.meta.items():
+            if key == "operations":
+                continue
+        if "repository" in self.meta:
+            dictionary["repository"] = self.repository.url
+        if "ledger" in dictionary:
+            dictionary.pop("ledger")
+        if "pipelines" in dictionary:
+            dictionary.pop("pipelines")
+
+        if "productions" in dictionary:
+            dictionary.pop("productions")
+
+        if not event:
+            output = dictionary
+        else:
+            output = {self.name: dictionary}
+        return output
+
+    
+    # @property
+    # def priors(self):
+    #     if "priors" in self.meta:
+    #         priors = self.meta["priors"]
+    #     else:
+    #         priors = None
+    #     return priors
 
     @property
     def finished(self):
@@ -187,10 +265,12 @@ class SimpleAnalysis(Analysis):
             self.status_str = status.lower()
         else:
             self.status_str = "none"
-            self.pipeline = pipeline.lower()
-            self.comment = comment
-            self.meta = deepcopy(self.subject.meta)
-            self.meta = update(self.meta, kwargs)
+        self.pipeline = pipeline
+        self.pipeline = known_pipelines[pipeline.lower()](self)
+        self.category = config.get("general", "calibration_directory")
+        self.comment = comment
+        self.meta = deepcopy(self.subject.meta)
+        self.meta = update(self.meta, kwargs)
 
 
 class SubjectAnalysis(Analysis):
@@ -235,7 +315,7 @@ class GravitationalWaveTransient(SimpleAnalysis):
     """
 
     def __init__(self, event, name, status, pipeline, comment=None, **kwargs):
-        self.event = event if isinstance(event, Event) else event[0]
+        self.event = event if not isinstance(event, list) else event[0]
         self.subject = self.event
         self.name = name
 
@@ -504,79 +584,6 @@ class GravitationalWaveTransient(SimpleAnalysis):
         if self.event.issue_object:
             self.event.issue_object.update_data()
 
-    def to_dict(self, event=True):
-        """
-        Return this production as a dictionary.
-
-        Parameters
-        ----------
-        event : bool
-           If set to True the output is designed to be included nested within an event.
-           The event name is not included in the representation, and the production name is provided as a key.
-        """
-        dictionary = deepcopy(self.meta)
-        if not event:
-            dictionary["event"] = self.event.name
-            dictionary["name"] = self.name
-
-        dictionary["status"] = self.status
-        dictionary["pipeline"] = self.pipeline.name.lower()
-        dictionary["comment"] = self.comment
-
-        dictionary["review"] = self.review.to_dicts()
-
-        if "data" in self.meta:
-            dictionary["data"] = self.meta["data"]
-        if "likelihood" in self.meta:
-            dictionary["likelihood"] = self.meta["likelihood"]
-        if "quality" in self.meta:
-            dictionary["quality"] = self.meta["quality"]
-        if "priors" in self.meta:
-            dictionary["priors"] = self.meta["priors"]
-        if "waveform" in self.meta:
-            dictionary["waveform"] = self.meta["waveform"]
-        dictionary["needs"] = self.dependencies
-        dictionary["job id"] = self.job_id
-
-        # Remove duplicates of pipeline defaults
-        if self.pipeline.name.lower() in self.event.ledger.data["pipelines"]:
-            defaults = deepcopy(
-                self.event.ledger.data["pipelines"][self.pipeline.name.lower()]
-            )
-        else:
-            defaults = {}
-
-        if "postprocessing" in self.event.ledger.data:
-            defaults["postprocessing"] = deepcopy(
-                self.event.ledger.data["postprocessing"]
-            )
-
-        if "ledger" in self.event.meta:
-            self.event.meta.pop("ledger")
-
-        defaults = update(defaults, deepcopy(self.event.meta))
-
-        dictionary = diff_dict(defaults, dictionary)
-
-        for key, value in self.meta.items():
-            if key == "operations":
-                continue
-        if "repository" in self.meta:
-            dictionary["repository"] = self.repository.url
-        if "ledger" in dictionary:
-            dictionary.pop("ledger")
-        if "pipelines" in dictionary:
-            dictionary.pop("pipelines")
-
-        if "productions" in dictionary:
-            dictionary.pop("productions")
-
-        if not event:
-            output = dictionary
-        else:
-            output = {self.name: dictionary}
-        return output
-
     @property
     def rundir(self):
         """
@@ -636,7 +643,7 @@ class GravitationalWaveTransient(SimpleAnalysis):
                         production=self.name,
                     )
             except Exception as e:
-                raise Exception(
+                raise DescriptionException(
                     "The sample rate for this event cannot be found.",
                     issue=self.event.issue_object,
                     production=self.name,
@@ -741,8 +748,8 @@ class GravitationalWaveTransient(SimpleAnalysis):
 
         # Check all of the required parameters are included
         if not {"status", "pipeline"} <= pars.keys():
-            raise Exception(
-                f"Some of the required parameters are missing from {name}", issue, name
+            raise DescriptionException(
+                f"Some of the required parameters are missing from {name}",  name
             )
         if "comment" not in pars:
             pars["comment"] = None
@@ -934,5 +941,5 @@ class GravitationalWaveTransient(SimpleAnalysis):
         return card
 
 
-class Production(SimpleAnalysis):
+class Production(GravitationalWaveTransient):
     pass

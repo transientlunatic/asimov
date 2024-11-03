@@ -2,11 +2,7 @@
 Trigger handling code.
 """
 
-import glob
 import os
-import pathlib
-from copy import deepcopy
-import configparser
 import subprocess
 
 import networkx as nx
@@ -19,10 +15,9 @@ from asimov.analysis import Production
 from asimov.pipelines import known_pipelines
 from asimov.storage import Store
 from asimov.utils import update, diff_dict
+from asimov.exceptions import DescriptionException
 
 from .git import EventRepo
-from .ini import RunConfiguration
-from .review import Review
 
 status_map = {
     "cancelled": "light",
@@ -39,42 +34,6 @@ status_map = {
     "stopped": "light",
 }
 
-
-class DescriptionException(Exception):
-    """Exception for event description problems."""
-
-    def __init__(self, message, issue=None, production=None):
-        super(DescriptionException, self).__init__(message)
-        self.message = message
-        self.issue = issue
-        self.production = production
-
-    def __repr__(self):
-        text = f"""
-An error was detected with the YAML markup in this issue.
-Please fix the error and then remove the `yaml-error` label from this issue.
-<p>
-  <details>
-     <summary>Click for details of the error</summary>
-     <p><b>Production</b>: {self.production}</p>
-     <p>{self.message}</p>
-  </details>
-</p>
-
-- [ ] Resolved
-"""
-        return text
-
-    def submit_comment(self):
-        """
-        Submit this exception as a comment on the gitlab
-        issue for the event.
-        """
-        if self.issue:
-            self.issue.add_label("yaml-error", state=False)
-            self.issue.add_note(self.__repr__())
-        else:
-            print(self.__repr__())
 
 
 class Event:
