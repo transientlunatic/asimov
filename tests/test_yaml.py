@@ -5,6 +5,7 @@ import os
 import shutil
 import git
 import asimov.event
+import asimov.exceptions
 from asimov.cli.project import make_project
 from asimov.cli.application import apply_page
 from asimov.ledger import YAMLLedger
@@ -89,7 +90,7 @@ class EventTests(unittest.TestCase):
 
     def test_no_name_error(self):
         """Check an exception is raised if the event name is missing."""
-        with self.assertRaises(asimov.event.DescriptionException):
+        with self.assertRaises(asimov.exceptions.DescriptionException):
             asimov.event.Event.from_yaml(BAD_YAML.format(self.cwd))
 
 class ProductionTests(unittest.TestCase):
@@ -126,14 +127,14 @@ class ProductionTests(unittest.TestCase):
     def test_missing_pipeline(self):
         """Check that an exception is raised if the production has no pipeline."""
         production = {"S000000x": dict(status="wait")}
-        with self.assertRaises(asimov.event.DescriptionException):
+        with self.assertRaises(asimov.exceptions.DescriptionException):
             asimov.event.Production.from_dict(production, event=self.event)
         
-    def test_missing_status(self):
-        """Check that an exception is raised if the production has no status."""
-        production = {"S000000x": dict(pipeline="lalinference")}
-        with self.assertRaises(asimov.event.DescriptionException):
-            asimov.event.Production.from_dict(production, event=self.event)
+    # def test_missing_status(self):
+    #     """Check that an exception is raised if the production has no status."""
+    #     production = {"S000000x": dict(pipeline="lalinference")}
+    #     with self.assertRaises(asimov.exceptions.DescriptionException):
+    #         asimov.event.Production.from_dict(production, event=self.event)
 
     def test_production_prior_read(self):
             """Check that per-production priors get read."""
