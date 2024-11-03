@@ -62,6 +62,27 @@ class Analysis:
             dependencies = None
         return dependencies
 
+    @classmethod
+    def from_dict(cls, parameters, event, issue=None):
+        name, pars = list(parameters.items())[0]
+        # Check that pars is a dictionary
+        if not isinstance(pars, dict):
+            if "event" in parameters:
+                parameters.pop("event")
+
+            if "status" not in parameters:
+                parameters["status"] = "ready"
+
+            return cls(event=event, **parameters)
+
+        if "comment" not in pars:
+            pars["comment"] = None
+        if "event" in pars:
+            pars.pop(event)
+
+        return cls(event, name, **pars)
+
+    
     @property
     def priors(self):
         if "priors" in self.meta:
@@ -609,13 +630,13 @@ class GravitationalWaveTransient(SimpleAnalysis):
                 ):
                     sample_rate = self.meta["likelihood"]["sample rate"]
                 else:
-                    raise DescriptionException(
+                    raise Exception(
                         "The sample rate for this event cannot be found.",
                         issue=self.event.issue_object,
                         production=self.name,
                     )
             except Exception as e:
-                raise DescriptionException(
+                raise Exception(
                     "The sample rate for this event cannot be found.",
                     issue=self.event.issue_object,
                     production=self.name,
@@ -720,7 +741,7 @@ class GravitationalWaveTransient(SimpleAnalysis):
 
         # Check all of the required parameters are included
         if not {"status", "pipeline"} <= pars.keys():
-            raise DescriptionException(
+            raise Exception(
                 f"Some of the required parameters are missing from {name}", issue, name
             )
         if "comment" not in pars:
