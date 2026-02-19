@@ -529,6 +529,23 @@ class Event:
                     review_message = latest_review.message if latest_review.message else ''
             return review_status, review_message
         
+        def get_profiling_attrs(node):
+            """Extract profiling data attributes from a node's meta."""
+            profiling = {}
+            if hasattr(node, 'meta') and isinstance(node.meta, dict):
+                profiling = node.meta.get('profiling', {}) or {}
+            runtime = profiling.get('runtime', '')
+            cpus = profiling.get('cpus', '')
+            gpus = profiling.get('gpus', '')
+            end = profiling.get('end', '')
+            return (
+                f'data-profiling-runtime="{runtime}" '
+                f'data-profiling-cpus="{cpus}" '
+                f'data-profiling-gpus="{gpus}" '
+                f'data-profiling-end="{end}"'
+            )
+
+
         card = f"""
         <div class="card event-data" id="card-{self.name}" data-event-name="{self.name}">
         <div class="card-body">
@@ -705,7 +722,8 @@ Object.assign(window.asimovNodeMap, {node_map_js});
                          data-result-pages="{result_pages_str_escaped}"
                          data-pages-dir="{pages_dir_escaped}"
                          data-modal-plots="{modal_plots_str_escaped}"
-                         data-modal-plot-labels="{modal_plot_labels_str_escaped}"></div>"""
+                         data-modal-plot-labels="{modal_plot_labels_str_escaped}"
+                         {get_profiling_attrs(node)}></div>"""
 
             except Exception as e:
                 card += f'<p class="text-muted">Error generating modal data: {str(e)}</p>'
