@@ -1,3 +1,51 @@
+0.7.0
+=====
+
+This is a major feature release introducing the plugin architecture and removing built-in pipeline implementations.
+
+Breaking Changes
+----------------
+
+**Built-in pipelines removed from core**: All analysis pipelines are now provided exclusively via plugin packages.
+
+- **Bilby**: Provided by ``bilby_pipe`` plugin package
+- **BayesWave**: Provided by ``asimov-bayeswave`` plugin package
+- **LALInference**: Provided by ``asimov-lalinference`` plugin package
+- **PESummary**: Provided by ``asimov-pesummary`` plugin package
+
+Install with: ``pip install asimov[gw]`` or install plugins individually.
+Existing ledger files require no changes - plugins are automatically discovered when installed.
+
+New Features
+------------
+
+**Optional dependency groups**:
+  - ``[gw]``: Gravitational wave analysis tools (bilby_pipe, asimov-bayeswave, asimov-lalinference, asimov-pesummary plugins)
+  - ``[docs]``: Documentation building tools
+
+**Prior interface system**: Restored the general-purpose ``asimov.priors`` module that provides a flexible prior specification system for pipeline plugins.
+
+Bug Fixes
+---------
+
++ Restored ``asimov/priors.py`` which was inadvertently removed during pipeline migration
++ Removed orphaned test files for all migrated pipelines that referenced non-existent modules
+
+Documentation
+-------------
+
++ Updated all pipeline documentation to reflect plugin architecture
++ Added installation instructions for optional dependency groups
++ Updated tutorials to use ``asimov[gw]`` installation
++ Added migration guide for upgrading from asimov <0.7
+
+Notes
+-----
+
+This release completes the transition to a plugin-based architecture begun in 0.6.0.
+All analysis pipelines (bilby, bayeswave, lalinference, pesummary) that were previously built-in
+are now provided as plugins. Only RIFT remains in core temporarily for compatibility.
+
 0.6.1
 =====
 

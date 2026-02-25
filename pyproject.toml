@@ -64,6 +64,13 @@ docs = [
 	"sphinx-multiversion"
 ]
 
+gw = [
+	"bilby_pipe[asimov]>=1.0.0",  # Provides bilby pipeline plugin
+	"asimov-bayeswave[asimov]>=0.0.1",  # Provides bayeswave pipeline plugin
+	"asimov-lalinference[asimov]>=0.0.1",  # Provides lalinference pipeline plugin
+	"asimov-pesummary[asimov]>=0.0.1",  # Provides pesummary pipeline plugin
+]
+
 [project.scripts]
 olivaw = "asimov.olivaw:olivaw"
 asimov = "asimov.olivaw:olivaw"
