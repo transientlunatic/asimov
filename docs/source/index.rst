@@ -124,6 +124,7 @@ Users' guide
 
    getting-started
    installation
+   blueprints
    architecture
    glossary
    user-guide/projects
@@ -133,16 +134,8 @@ Users' guide
    user-guide/monitoring
    user-guide/reporting
    storage
-   olivaw/review
    citing
-	     
-.. toctree::
-   :maxdepth: 2
-   :caption: The Ledger
 
-   ledger
-      
-   
 .. toctree::
    :maxdepth: 1
    :caption: Pipeline Guides
@@ -160,11 +153,13 @@ Advanced topics
    :caption: Advanced topics
 
    analyses
+   priors
    build-process
    cli-reference
    scheduler-integration
    monitor-state-machine
    monitor-api
+   template-reference
    configuration
    troubleshooting
    faq
@@ -197,6 +192,7 @@ Tutorials
    :maxdepth: 1
    :Caption: Tutorials
 
+   tutorials/python-api-tutorial
    tutorials/analysing-gw150914
    tutorials/adding-a-pipeline
    tutorials/remixing-analyses
@@ -211,11 +207,18 @@ Python API
 
    python-api
    api/project
+   api/analysis
+   api/blueprints
+   api/strategies
+   api/monitor_states
+   api/monitor_helpers
+   api/storage
+   api/priors
+   api/review
    api/asimov
    api/condor
    api/event
    api/git
-   api/gitlab
    api/ini
    api/ledger
    api/locutus

@@ -3,165 +3,188 @@
 Python API
 ==========
 
-Overview
---------
+In addition to the command-line interface, asimov provides a Python API that allows you to
+create and manage projects programmatically. This is particularly useful for:
 
-In addition to the command-line interface, asimov provides a Python API that allows you to create and manage projects programmatically. This is particularly useful for:
+* Setting up a project from a script or Jupyter notebook
+* Adding events and applying blueprints without leaving Python
+* Inspecting analysis status programmatically
+* Integrating asimov into larger automated workflows
 
-* Creating projects from Python scripts
-* Automating project setup and configuration
-* Integrating asimov into larger workflows
-* Creating analyses programmatically
+The primary interface for configuring analyses remains **blueprints** applied via
+:ref:`asimov apply <blueprints>`. The Python API handles project creation, event management,
+and status inspection; it does not replace blueprints.
 
 Creating a New Project
 ----------------------
 
-You can create a new asimov project directly from Python using the ``Project`` class:
+Use the ``Project`` class to create a new asimov project from Python.
+This produces the same directory structure and configuration files as ``asimov init``:
 
 .. code-block:: python
 
     from asimov.project import Project
-    
-    # Create a new project
+
     project = Project(
-        name="My Project",
-        location="/path/to/project"
+        name="GWTC-3 Reanalysis",
+        location="/data/projects/gwtc3"
     )
 
-This creates the same directory structure and configuration files as the ``asimov init`` command.
-
-Working with Projects
----------------------
-
-The ``Project`` class provides a context manager interface that ensures the project ledger is properly saved after making changes:
-
-.. code-block:: python
-
-    from asimov.project import Project
-    
-    # Create a new project (see "Loading an Existing Project" below for loading existing projects)
-    project = Project("My Project", location="/path/to/project")
-    
-    # Use the context manager to make changes
-    with project:
-        # Add a subject (event) to the project
-        subject = project.add_subject(name="GW150914")
-        
-        # Add an analysis to the subject
-        from asimov.analysis import GravitationalWaveTransient
-        
-        production = GravitationalWaveTransient(
-            subject=subject,
-            name="bilby_production",
-            pipeline="bilby",
-            status="ready",
-            ledger=project.ledger
-        )
-        
-        subject.add_production(production)
-        # The ledger will be updated when exiting the context manager
-        project.ledger.update_event(subject)
-    
-    # When the context exits, changes are automatically saved
+If the target directory already contains a project, ``Project()`` raises a ``RuntimeError``.
+Use :meth:`~asimov.project.Project.load` instead (see below).
 
 Loading an Existing Project
 ----------------------------
 
-You can load an existing asimov project using the ``Project.load()`` class method:
+Load a project that was created with ``asimov init`` or a previous ``Project()`` call:
 
 .. code-block:: python
 
     from asimov.project import Project
-    
-    # Load an existing project
-    project = Project.load("/path/to/existing/project")
-    
-    # Access events in the project
-    events = project.get_event()
-    for event in events:
+
+    project = Project.load("/data/projects/gwtc3")
+
+Working with the Context Manager
+---------------------------------
+
+All mutating operations (adding subjects, applying blueprints via the API) must be performed
+inside a ``with project:`` block. The context manager changes into the project directory and
+saves the ledger atomically when the block exits without error:
+
+.. code-block:: python
+
+    from asimov.project import Project
+
+    project = Project.load("/data/projects/gwtc3")
+
+    with project:
+        subject = project.add_subject(name="GW150914_095045")
+        # Further changes happen here; the ledger is written on exit
+
+If an exception is raised inside the block, the ledger is **not** saved, so the project
+state is left unchanged.
+
+Adding Subjects (Events)
+------------------------
+
+Call :meth:`~asimov.project.Project.add_subject` inside a context block:
+
+.. code-block:: python
+
+    with project:
+        gw150914 = project.add_subject(name="GW150914_095045")
+        gw151012 = project.add_subject(name="GW151012_095443")
+        gw151226 = project.add_subject(name="GW151226_033853")
+
+Applying Blueprints Programmatically
+--------------------------------------
+
+After adding subjects, use ``asimov apply`` to attach analyses.
+The CLI is the most straightforward way:
+
+.. code-block:: console
+
+    $ asimov apply -f bilby-analysis.yaml --event GW150914_095045
+
+You can also shell out from Python if you want to keep everything in one script:
+
+.. code-block:: python
+
+    import subprocess
+
+    subprocess.run(
+        ["asimov", "apply", "-f", "bilby-analysis.yaml",
+         "--event", "GW150914_095045"],
+        check=True,
+        cwd="/data/projects/gwtc3"
+    )
+
+See :ref:`blueprints` for the blueprint YAML format and :doc:`pipelines/bilby`,
+:doc:`pipelines/rift`, :doc:`pipelines/bayeswave` for pipeline-specific settings.
+
+Inspecting Events and Analyses
+--------------------------------
+
+Use :meth:`~asimov.project.Project.get_event` to read back subjects and their analyses:
+
+.. code-block:: python
+
+    project = Project.load("/data/projects/gwtc3")
+
+    # All events
+    for event in project.get_event():
         print(f"Event: {event.name}")
         for production in event.productions:
-            print(f"  - {production.name}: {production.status}")
+            print(f"  {production.name}  ({production.pipeline})  [{production.status}]")
 
-Adding Multiple Subjects
--------------------------
+    # A single event by name
+    gw150914 = project.get_event("GW150914_095045")
+    print(gw150914.productions)
 
-You can add multiple subjects to a project within the same context:
+Running the Monitor
+--------------------
 
-.. code-block:: python
-
-    from asimov.project import Project
-    
-    project = Project("Multi-Event Project", location="/path/to/project")
-    
-    with project:
-        # Add multiple events
-        gw150914 = project.add_subject(name="GW150914")
-        gw151012 = project.add_subject(name="GW151012")
-        gw151226 = project.add_subject(name="GW151226")
-
-Accessing the Ledger
----------------------
-
-The project's ledger can be accessed through the ``ledger`` property:
+To run the monitor loop from Python (equivalent to ``asimov monitor``), use
+:func:`~asimov.monitor_api.run_monitor`:
 
 .. code-block:: python
 
-    project = Project.load("/path/to/project")
-    
-    # Access the ledger
-    ledger = project.ledger
-    
-    # Get all events
-    all_events = ledger.get_event()
-    
-    # Get a specific event
-    specific_event = ledger.get_event("GW150914")
+    from asimov.monitor_api import run_monitor
+
+    run_monitor()
+
+Call this after changing into the project directory, or use it inside an
+``asimov start`` / ``asimov stop`` managed loop. See :doc:`monitor-api` for details.
 
 Complete Example
 ----------------
 
-Here's a complete example showing how to create a project, add events, and configure analyses:
+The following script creates a project, adds three O1 events, applies a bilby
+blueprint to each, and then inspects the result:
 
 .. code-block:: python
 
+    import subprocess
     from asimov.project import Project
-    from asimov.analysis import GravitationalWaveTransient
-    
-    # Create a new project
-    project = Project(
-        name="GWTC-1 Reanalysis",
-        location="/data/projects/gwtc1"
-    )
-    
+
+    EVENTS = ["GW150914_095045", "GW151012_095443", "GW151226_033853"]
+    PROJECT_DIR = "/data/projects/o1-reanalysis"
+
+    # --- Create the project ---
+    project = Project(name="O1 Reanalysis", location=PROJECT_DIR)
+
     with project:
-        # Add events from GWTC-1
-        for event_name in ["GW150914", "GW151012", "GW151226"]:
-            subject = project.add_subject(name=event_name)
-            
-            # Add a Bilby analysis
-            bilby_prod = GravitationalWaveTransient(
-                subject=subject,
-                name=f"{event_name}_bilby",
-                pipeline="bilby",
-                status="ready",
-                ledger=project.ledger
-            )
-            subject.add_production(bilby_prod)
-            project.ledger.update_event(subject)
-    
-    # After exiting the context, all changes are saved
-    print(f"Project created with {len(project.get_event())} events")
+        for name in EVENTS:
+            project.add_subject(name=name)
 
-Context Manager Benefits
--------------------------
+    # --- Apply a blueprint to each event ---
+    blueprint = """
+    kind: analysis
+    name: pe-bilby
+    pipeline: bilby
+    comment: IMRPhenomXPHM parameter estimation.
+    waveform:
+      approximant: IMRPhenomXPHM
+      reference frequency: 20
+    needs:
+      - pipeline: bayeswave
+    """
 
-The context manager approach ensures that:
+    with open("bilby.yaml", "w") as f:
+        f.write(blueprint)
 
-1. **Transactional Updates**: Changes to the ledger are grouped together and saved atomically
-2. **Automatic Saving**: You don't need to manually call ``save()`` on the ledger
-3. **Clean Resource Management**: The project directory is properly managed during operations
-4. **Error Handling**: If an error occurs, the ledger is not saved, preventing partial updates
+    for name in EVENTS:
+        subprocess.run(
+            ["asimov", "apply", "-f", "bilby.yaml", "--event", name],
+            check=True,
+            cwd=PROJECT_DIR,
+        )
+
+    # --- Inspect ---
+    project = Project.load(PROJECT_DIR)
+    for event in project.get_event():
+        for prod in event.productions:
+            print(f"{event.name}  {prod.name}  [{prod.status}]")
 
 API Reference
 -------------

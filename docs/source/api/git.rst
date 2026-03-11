@@ -7,3 +7,4 @@ The git module is designed to allow interaction between the bot and git reposito
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:

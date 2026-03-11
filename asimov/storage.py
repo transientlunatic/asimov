@@ -10,11 +10,10 @@ Configuration options
 
 Configuration options for the storage API can be found in the `storage` namespace.
 
-```
-[storage]
-root = /path/to/the/storage/root
+.. code-block:: ini
 
-```
+   [storage]
+   root = /path/to/the/storage/root
 
 """
 

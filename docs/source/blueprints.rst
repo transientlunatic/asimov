@@ -1,3 +1,5 @@
+.. _blueprints:
+
 =================
 Asimov Blueprints
 =================
@@ -10,9 +12,11 @@ Adding a blueprint to an asimov project
 
 Asimov parses the contents of a blueprint file using the ``asimov apply`` command. This will cause asimov to read the contents of the blueprint, and add it to its internal database.
 
-For example, if we have a blueprint file called ``GW150914_095045.yaml`` we can add it to the project by running::
+For example, if we have a blueprint file called ``GW150914_095045.yaml`` we can add it to the project by running:
 
-    asimov apply -f GW150914_095045.yaml
+.. code-block:: console
+
+    $ asimov apply -f GW150914_095045.yaml
 
 Kinds of blueprint
 ==================
@@ -34,7 +38,9 @@ The blueprint's kind must be specified using the ``kind`` keyword.
    * - ``subject``
      - These blueprint files define an analysis subject (for example a gravitational wave event).
 
-For example, to make a (very minimal) event blueprint: ::
+For example, to make a (very minimal) event blueprint:
+
+.. code-block:: yaml
 
   kind: event
   name: GW150914_095045
@@ -47,7 +53,9 @@ You can include multiple blueprints in the same file so that they can be added t
 
 Individual blueprints should be separated by three hyphens ``---`` in a row on their own line.
 
-For example::
+For example:
+
+.. code-block:: yaml
 
     kind: analysis
     name: generate-psds
@@ -71,7 +79,9 @@ The order of precedence is as follows (with ``analysis`` settings being given hi
 3. Settings defined in the ``pipelines`` heading
 4. Settings defined globally.
 
-For example, consider a project using the following blueprints::
+For example, consider a project using the following blueprints:
+
+.. code-block:: yaml
 
     kind: configuration
     likelihood:
@@ -96,7 +106,9 @@ For example, consider a project using the following blueprints::
     likelihood:
       sample rate: 4096
 
-The analysis which would be created by these blueprints would have the following likelihood settings::
+The analysis which would be created by these blueprints would have the following likelihood settings:
+
+.. code-block:: yaml
 
     likelihood:
       sample rate: 4096    # From the analysis setting, overwriting the global value
@@ -111,7 +123,9 @@ Blueprint YAML Syntax
 Reading the documentation
 -------------------------
 
-Asimov blueprint files utilise the hierarchical structure of YAML files to divide settings into logical groupings. In this documentation we collapse the hierarchical structure using colons in settings names. For example, ``likelihood:marginalisation:distance: True`` corresponds to the structure::
+Asimov blueprint files utilise the hierarchical structure of YAML files to divide settings into logical groupings. In this documentation we collapse the hierarchical structure using colons in settings names. For example, ``likelihood:marginalisation:distance: True`` corresponds to the structure:
+
+.. code-block:: yaml
 
     likelihood:
       marginalisation:
@@ -166,7 +180,9 @@ Requirements can be specified in the ``needs`` setting of an analysis using a fl
 Simple name-based dependencies
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The simplest form of dependency is to specify the name of a required analysis::
+The simplest form of dependency is to specify the name of a required analysis:
+
+.. code-block:: yaml
 
     kind: analysis
     name: generate-psds
@@ -181,7 +197,9 @@ The simplest form of dependency is to specify the name of a required analysis::
 Property-based dependencies
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Dependencies can also be specified using properties of analyses. Any property can be used, including nested properties accessed with dot notation::
+Dependencies can also be specified using properties of analyses. Any property can be used, including nested properties accessed with dot notation:
+
+.. code-block:: yaml
 
     kind: analysis
     name: parameter-estimation
@@ -195,7 +213,9 @@ This will match all analyses that use the ``bayeswave`` pipeline OR have ``IMRPh
 Review status dependencies
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The review status is a commonly used dependency criterion::
+The review status is a commonly used dependency criterion:
+
+.. code-block:: yaml
 
     kind: analysis
     name: combiner
@@ -206,7 +226,9 @@ The review status is a commonly used dependency criterion::
 Negated dependencies
 ^^^^^^^^^^^^^^^^^^^^
 
-You can specify that an analysis should depend on analyses that do NOT match a criterion by prefixing the value with ``!``::
+You can specify that an analysis should depend on analyses that do NOT match a criterion by prefixing the value with ``!``:
+
+.. code-block:: yaml
 
     kind: analysis
     name: non-bayeswave-analyses
@@ -219,7 +241,9 @@ This will match all analyses except those using the bayeswave pipeline.
 OR logic (multiple dependencies)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-By default, multiple items in the ``needs`` list are combined with OR logic. An analysis will depend on any analysis matching ANY of the conditions::
+By default, multiple items in the ``needs`` list are combined with OR logic. An analysis will depend on any analysis matching ANY of the conditions:
+
+.. code-block:: yaml
 
     kind: analysis
     name: combiner
@@ -233,7 +257,9 @@ This will match analyses using either ``IMRPhenomXPHM`` OR ``SEOBNRv5PHM``.
 AND logic (all conditions must match)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-To specify that ALL conditions must match (AND logic), use a nested list::
+To specify that ALL conditions must match (AND logic), use a nested list:
+
+.. code-block:: yaml
 
     kind: analysis
     name: specific-analysis
@@ -247,7 +273,9 @@ This will only match analyses that are both approved AND use IMRPhenomXPHM.
 Complex dependency specifications
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-You can combine AND and OR logic for complex dependency specifications::
+You can combine AND and OR logic for complex dependency specifications:
+
+.. code-block:: yaml
 
     kind: analysis
     name: complex-combiner
@@ -264,7 +292,9 @@ Dependency tracking and staleness
 
 When an analysis runs, asimov records which analyses were its dependencies at that time. If the set of matching analyses changes later (for example, if new analyses are added that match the dependency criteria), the original analysis is marked as **stale**.
 
-Stale analyses are indicated in the HTML report. You can mark an analysis as **refreshable** to indicate it should be automatically re-run when it becomes stale::
+Stale analyses are indicated in the HTML report. You can mark an analysis as **refreshable** to indicate it should be automatically re-run when it becomes stale:
+
+.. code-block:: yaml
 
     kind: analysis
     name: auto-refresh-analysis
@@ -288,7 +318,9 @@ Strategies allow you to create multiple similar analyses with parameter variatio
 Basic Strategy Syntax
 ---------------------
 
-A strategy is defined using the ``strategy`` keyword in an analysis blueprint. The strategy specifies parameters and the values they should take::
+A strategy is defined using the ``strategy`` keyword in an analysis blueprint. The strategy specifies parameters and the values they should take:
+
+.. code-block:: yaml
 
     kind: analysis
     name: bilby-{waveform.approximant}
@@ -308,7 +340,9 @@ This will create three separate analyses:
 Name Templates
 --------------
 
-The ``name`` field can include placeholders in curly braces (``{}``) that will be replaced with strategy parameter values. The placeholder name should match the full parameter path::
+The ``name`` field can include placeholders in curly braces (``{}``) that will be replaced with strategy parameter values. The placeholder name should match the full parameter path:
+
+.. code-block:: yaml
 
     kind: analysis
     name: bilby-{waveform.approximant}-analysis
@@ -327,7 +361,9 @@ If no placeholder is used, all generated analyses will have the same name, which
 Matrix Strategies (Multiple Parameters)
 ----------------------------------------
 
-You can specify multiple parameters in a strategy to create all combinations (cross-product)::
+You can specify multiple parameters in a strategy to create all combinations (cross-product):
+
+.. code-block:: yaml
 
     kind: analysis
     name: bilby-{waveform.approximant}-{sampler.sampler}
@@ -350,7 +386,9 @@ This creates 4 analyses (2 × 2 combinations):
 Nested Parameters
 -----------------
 
-Strategy parameters can use dot notation to set deeply nested values::
+Strategy parameters can use dot notation to set deeply nested values:
+
+.. code-block:: yaml
 
     kind: analysis
     name: bilby-margdist-{likelihood.marginalisation.distance}
@@ -373,7 +411,9 @@ This sets ``likelihood.marginalisation.distance`` in the generated analyses.
 Complete Strategy Example
 -------------------------
 
-Here's a complete example combining multiple features::
+Here's a complete example combining multiple features:
+
+.. code-block:: yaml
 
     kind: analysis
     name: pe-{waveform.approximant}-{sampler.sampler}
@@ -417,9 +457,9 @@ General waveform settings
      -
    * - ``waveform:generator``
      - See individual pipeline documentation.
-     -
+     - The generator to be used for the waveform.
    * - ``waveform:reference frequency``
-     - 
+     -
      - The reference frequency at which spins etc are defined.
    * - ``likelihood:start frequency``
      - ``float``
@@ -427,9 +467,6 @@ General waveform settings
    * - ``waveform:conversion function``
      - See individual pipeline documentation.
      - A function which can be used to perform conversions for the waveform.
-   * - ``waveform:generator``
-     - See individual pipeline documentation.
-     - The generator to be used for the waveform.
    * - ``waveform:approximant``
      -
      - The name of the waveform approximant to be used.
@@ -540,7 +577,7 @@ These settings allow various marginalisations to be turned on or off, and config
    * - likelihood:marginalisation:phase
      - True, False
      -
-   * - likelihhod:marginalisation:time
+   * - likelihood:marginalisation:time
      - True, False
      -
    * - likelihood:marginalisation:calibration
@@ -570,7 +607,7 @@ These settings can be used to configure reduced order quadrature (ROQ) bases for
    * - likelihood:roq:linear matrix
      -
      -
-   * - likelihhod:roq:quadratic matrix
+   * - likelihood:roq:quadratic matrix
      -
      -
 

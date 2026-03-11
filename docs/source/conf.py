@@ -56,6 +56,7 @@ extensions = [
     'sphinxcontrib.autohttp.flask',
     "sphinx_multiversion",
     "sphinxcontrib.autodoc_pydantic",
+    "kentigern.ext.steps",
 ]
 
 html_logo = "textmark.png"

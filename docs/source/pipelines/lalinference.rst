@@ -1,108 +1,166 @@
 .. _lalinference-pipelines:
 
-LALInference Pipelines
-======================
+LALInference pipeline
+=====================
 
-Asimov provides full support for the LALInference pipeline.
-While LALInference has been largely superseded by newer sampling techniques it can still be helpful to be able to run jobs using it both for carrying-out cross checks, and for replicating older analyses.
+Asimov provides support for the `LALInference <https://lscsoft.docs.ligo.org/lalsuite/lalinference/>`_ pipeline.
+While LALInference has been largely superseded by bilby and RIFT for new analyses, the interface
+remains useful for cross-checks and for replicating older results.
 
 Review status
 -------------
 
 .. warning::
+   The LALInference integration has been deprecated and must not be used for new collaboration
+   parameter estimation analyses.
 
-   **v0.4.0**
-     The integration with LALInference has been deprecated.
-     It *must not* be used for collaboration parameter estimation analyses.
+Quick start
+-----------
+
+A LALInference blueprint requires specifying the inference engine (``lalinferencenest`` for
+nested sampling, or ``lalinferencemcmc`` for MCMC):
+
+.. code-block:: yaml
+
+   kind: analysis
+   name: pe-lalinference
+   pipeline: lalinference
+   comment: LALInference nested sampling.
+   waveform:
+     approximant: IMRPhenomXPHM
+     reference frequency: 20
+   engine: lalinferencenest
+   nparallel: 8
+
+Apply it to an event with:
+
+.. code-block:: console
+
+   $ asimov apply -f lalinference.yaml --event GW150914_095045
 
 Examples
 --------
 
-LALInference with Markov Chain Monte Carlo
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: yaml
-
-   - Prod0:
-       pipeline: lalinference
-       approximant: IMRPhenomXPHM
-       nparallel: 25
-       engine: lalinferencemcmc
-       status: ready
-
-LALInference with Nested sampling
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-       
-.. code-block:: yaml
-
-   - Prod0:
-       pipeline: lalinference
-       approximant: IMRPhenomXPHM
-       nparallel: 25
-       engine: lalinferencenest
-       status: ready
-
-
-LALInference interface
-----------------------
-
-The LALInference interface can be used to submit jobs to condor clusters which use lalinference as the inference engine.
-LALInference jobs must be specified by an appropriately formatted ``ini`` file.
-
-Status messages
+Nested sampling
 ~~~~~~~~~~~~~~~
 
-Events run by the LALInference pipeline can have the following status values:
+.. code-block:: yaml
 
-``wait``
-   In this state the pipeline will ignore the production
+   kind: analysis
+   name: lalinference-nest
+   pipeline: lalinference
+   comment: LALInference with nested sampling.
+   waveform:
+     approximant: IMRPhenomXPHM
+     reference frequency: 20
+   engine: lalinferencenest
+   nparallel: 25
+   needs:
+     - pipeline: bayeswave
 
-``ready``
-   In this state asimov will attempt to submit the job to the condor scheduler
+Markov Chain Monte Carlo
+~~~~~~~~~~~~~~~~~~~~~~~~
 
-``running``
-   Applied after the job is submitted to the cluster
+.. code-block:: yaml
 
-``stuck``
-   Applied when the job is held or an error is detected in the pipeline's execution
+   kind: analysis
+   name: lalinference-mcmc
+   pipeline: lalinference
+   comment: LALInference with MCMC.
+   waveform:
+     approximant: IMRPhenomXPHM
+     reference frequency: 20
+   engine: lalinferencemcmc
+   nparallel: 25
+   needs:
+     - pipeline: bayeswave
 
-``finished``
-   Applied when normal termination of the pipeline is detected.
+Blueprint settings reference
+-----------------------------
 
+See :ref:`blueprints` for the full precedence rules and :ref:`template-reference` for how
+these settings map to variables inside the configuration template.
 
-Event metadata
-~~~~~~~~~~~~~~
+Top-level analysis settings
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In addition to the required event metadata, the LALInferance interface accepts the following event metadata fields:
+.. list-table::
+   :header-rows: 1
+   :widths: 35 15 50
 
-``rundir``
-   The run directory for this event (this will become the parent for unspecified production run directories).
+   * - Setting
+     - Type
+     - Description
+   * - ``engine``
+     - str
+     - The LALInference inference engine. Either ``"lalinferencenest"`` (nested sampling) or ``"lalinferencemcmc"`` (MCMC). **Required.**
+   * - ``nparallel``
+     - int
+     - Number of parallel chains or threads. **Required.**
 
-``webdir``
-   The web directory for this event (this will become the parent for production web directories).
+``waveform`` settings
+~~~~~~~~~~~~~~~~~~~~~
 
-Production metadata
-~~~~~~~~~~~~~~~~~~~
+.. list-table::
+   :header-rows: 1
+   :widths: 35 15 50
 
-In addition to the required production metadata the LALInference interface accepts the following metadata fields:
+   * - Setting
+     - Type
+     - Description
+   * - ``waveform:approximant``
+     - str
+     - Waveform approximant (e.g. ``IMRPhenomXPHM``). **Required.**
+   * - ``waveform:reference frequency``
+     - float
+     - Reference frequency in Hz. **Required.**
+   * - ``waveform:pn amplitude order``
+     - int
+     - Post-Newtonian amplitude order. Defaults to ``0``.
 
-``queue``
-   The condor queue which the job should be submitted to.
-   Defaults to ``Priority_PE`` if not specified.
+``likelihood`` settings
+~~~~~~~~~~~~~~~~~~~~~~~
 
-``rundir``
-   The desired run directory for the job.
-   DEfaults to ``<event.rundir>/<production.name>`` if event run directory is specified.
-   Defaults to ``~/event/production`` if the event run directory specified.
+.. list-table::
+   :header-rows: 1
+   :widths: 35 15 50
 
-Run data
-~~~~~~~~
+   * - Setting
+     - Type
+     - Description
+   * - ``likelihood:sample rate``
+     - int
+     - Sample rate in Hz. **Required.**
+   * - ``likelihood:start frequency``
+     - float
+     - Waveform generation start frequency.
 
-The following values will be added to the production meta data by asimov as a production is running
+``scheduler`` settings
+~~~~~~~~~~~~~~~~~~~~~~
 
-``user``
-   The accounting user who submitted the event.
+.. list-table::
+   :header-rows: 1
+   :widths: 35 15 50
 
-``job id``
-   The JobID for this event on the condor cluster.
+   * - Setting
+     - Type
+     - Description
+   * - ``scheduler:accounting group``
+     - str
+     - HTCondor accounting group. Required on most clusters.
+   * - ``scheduler:environment``
+     - str
+     - Path to the LALSuite software installation. Falls back to the global ``[pipelines] environment`` setting.
 
+Analysis states
+---------------
+
+LALInference analyses pass through the standard asimov states.
+See :ref:`states` for the full state machine description.
+
+See also
+--------
+
+* :ref:`template-reference` — Full Liquid template variable reference
+* :ref:`blueprints` — Blueprint YAML format and settings hierarchy
+* :doc:`bilby` — The recommended replacement for LALInference

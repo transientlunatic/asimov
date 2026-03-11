@@ -1,151 +1,174 @@
 .. _rift-pipelines:
 
-RIFT pipelines
-==============
+RIFT pipeline
+=============
 
-The RIFT interface allows the creation and control of RIFT analyses.
-A number of metadata are required to configure RIFT which are not required for other pipelines.
+The RIFT interface allows asimov to configure, submit, and monitor analyses using the
+`RIFT <https://github.com/oshaughn/research-projects-RIT>`_ (Rapid Iterative Fitting and Exploration) pipeline.
+RIFT uses a two-stage iterative approach: the ILE stage evaluates the likelihood on a grid, and the CIP stage fits a posterior from those evaluations.
 
-Review Status
+Review status
 -------------
 
 .. warning::
-   
-   **v0.4.0**
-     The current integration with RIFT is experimental, and is not reviewed.
-     It *must not* be used for collaboration parameter estimation analyses.
-     A reviewed version is expected to be available in the v0.5 series of releases.
+   The RIFT integration has not been fully reviewed.
+   It must not be used for collaboration parameter estimation analyses without additional review.
 
+Quick start
+-----------
+
+The minimal blueprint for a RIFT analysis is:
+
+.. code-block:: yaml
+
+   kind: analysis
+   name: pe-rift
+   pipeline: rift
+   comment: Parameter estimation with RIFT.
+   waveform:
+     approximant: SEOBNRv4PHM
+     reference frequency: 20
+
+Apply it to an event with:
+
+.. code-block:: console
+
+   $ asimov apply -f rift-analysis.yaml --event GW150914_095045
 
 Examples
 --------
 
-RIFT with SEOBNRv4PHM
+Standard parameter estimation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: yaml
+
+   kind: analysis
+   name: rift-seobnrv4phm
+   pipeline: rift
+   comment: SEOBNRv4PHM parameter estimation.
+   waveform:
+     approximant: SEOBNRv4PHM
+     reference frequency: 20
+     maximum mode: 4
+   likelihood:
+     marginalization:
+       distance: true
+       maximum distance: 10000
+   needs:
+     - pipeline: bayeswave
+
+With physical assumptions (binary neutron star)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+RIFT supports making explicit physical assumptions to speed up the analysis:
+
+.. code-block:: yaml
+
+   kind: analysis
+   name: rift-bns
+   pipeline: rift
+   comment: BNS analysis assuming matter effects.
+   waveform:
+     approximant: IMRPhenomPv2_NRTidalv2
+     reference frequency: 20
+   likelihood:
+     assume:
+       - matter
+       - nonprecessing
+
+With manual bootstrapping
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A pre-generated initial grid can be provided to bootstrap the run.
+The grid file must be placed in the event repository with the name ``<analysis-name>_bootstrap.xml.gz``:
+
+.. code-block:: yaml
+
+   kind: analysis
+   name: rift-bootstrap
+   pipeline: rift
+   comment: RIFT with a manual bootstrap grid.
+   waveform:
+     approximant: SEOBNRv4PHM
+     reference frequency: 20
+   bootstrap: manual
+   needs:
+     - name-of-grid-generating-analysis
+
+Blueprint settings reference
+-----------------------------
+
+The settings below can be specified in a RIFT blueprint at any level of the hierarchy
+(global, pipeline-defaults, event, or analysis-specific).
+See :ref:`blueprints` for the full precedence rules and :ref:`template-reference` for how
+these settings map to variables inside the configuration template.
+
+``waveform`` settings
 ~~~~~~~~~~~~~~~~~~~~~
 
-This was the default analysis setup for the O3 catalog runs which were used in the GWTC-2.1 and GWTC-3 catalog papers.
+.. list-table::
+   :header-rows: 1
+   :widths: 35 15 50
 
-.. code-block:: yaml
+   * - Setting
+     - Type
+     - Description
+   * - ``waveform:approximant``
+     - str
+     - Waveform approximant (e.g. ``SEOBNRv4PHM``). **Required.**
+   * - ``waveform:reference frequency``
+     - float
+     - Reference frequency in Hz at which spins are defined. **Required.**
+   * - ``waveform:maximum mode``
+     - int
+     - Maximum spherical harmonic mode order. Defaults to ``2``. If ``likelihood:start frequency`` is not set, it is derived as ``(2 / maximum mode) * minimum frequency``.
+   * - ``waveform:pn amplitude order``
+     - int
+     - Post-Newtonian amplitude order. Defaults to ``0``.
 
-   - Prod0:
-       pipeline: rift
-       approximant: SEOBNRv4PHM
-       status: ready
+``likelihood`` settings
+~~~~~~~~~~~~~~~~~~~~~~~
 
-RIFT with manual bootstrapping
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-       
-.. code-block:: yaml
+.. list-table::
+   :header-rows: 1
+   :widths: 35 15 50
 
-		- Prod8:
-		    pipeline: rift
-		    approximant: SEOBNRv4PHM
-		    bootstrap: manual
-		    status: ready
-       
+   * - Setting
+     - Type
+     - Description
+   * - ``likelihood:sample rate``
+     - int
+     - Sample rate in Hz. **Required.**
+   * - ``likelihood:start frequency``
+     - float
+     - Start frequency for waveform generation. If not set, derived from ``waveform:maximum mode`` and ``quality:minimum frequency``.
 
-Ledger Options
---------------
+Marginalisation settings
+"""""""""""""""""""""""""
 
-The RIFT pipeline interface looks for the the sections and values listed below in addition to the information which is required for analysing *all* gravitational wave events such as the locations of calibration envelopes and data.
+.. list-table::
+   :header-rows: 1
+   :widths: 35 15 50
 
+   * - Setting
+     - Type
+     - Description
+   * - ``likelihood:marginalization:distance``
+     - bool
+     - Enable distance marginalisation. Defaults to ``False``.
+   * - ``likelihood:marginalization:distance lookup``
+     - str
+     - Path to a pre-computed distance lookup table.
+   * - ``likelihood:marginalization:maximum distance``
+     - float
+     - Maximum distance in Mpc for distance marginalisation. Defaults to ``10000``.
 
-``bootstrap``
-~~~~~~~~~~~~~
+Physical assumption settings
+"""""""""""""""""""""""""""""
 
-.. note::
-   Full support for RIFT bootstrapping using asimov is still experimental, and care should be taken when using it.
-
-RIFT allows a previous analysis to be used to "bootstrap" a new analysis, and this can be specified via the ``bootstrap`` configuration on the entry in the ledger.
-
-The value ``manual`` can be passed to this parameter to provide a pre-generated bootstrapping grid to the analysis.
-This should be placed in the event repository in the same directory as the analysis configuration file, with the name ``ANALYSIS_NAME_bootstrap.xml.gz``.
-For example, for an analysis called ``Prod8`` the ledger entry for the analysis might look like this:
-
-.. code-block:: yaml
-
-		- Prod8:
-		    pipeline: rift
-		    approximant: SEOBNRv4PHM
-		    bootstrap: manual
-		    status: ready
-
-and the boostrap grid should be named ``Prod8_bootstrap.xml.gz``.
-
-You should combine this with a ``needs`` instruction, so that the RIFT job isn't run until the bootstrapping job has completed.
-
-
-The settings below are all of the RIFT-specific settings which can be specified in blueprints provided for RIFT analyses, which can be specified in addition to the general set for all gravitational wave pipelines.
-
-``sampler``
-~~~~~~~~~~~
-
-These settings specifically affect the sampling process within RIFT.
-Within the sampler settings there is a further sub-division for each stage of the analysis.
-
-CIP
-"""
-
-``explode jobs``
-  This alters the number of jobs to be used in the CIP stage of sampling.
-  The higher this number the lower the likely runtime.
-  If not provided it defaults to 3.
-
-``fitting method``
-  Determines the fitting method used in the CIP stage.
-  Can be either ``rf`` or ``gp``.
-  If not provided it defaults to ``rf``.
-
-``explode jobs auto``
-  TODO: Check what this does.
-
-``sampling method``
-  Determines the sampling method to be used in the CIP stage.
-  This can be ``default``, ``GMM``, or ``adaptive_cartesian_gpu``, and the latter does not require the use of GPUs during the CIP stage.
-  Default is ``default``
-
-``waveform``
-~~~~~~~~~~~~
-
-``maximum mode``
-  The maximum mode order to be used from the waveform model.
-  Note that if the ``likelihood>start frequency`` has not been set then it will be set as ``(2 / Lmax) * f_min``,
-  where ``Lmax`` is the maximum node set in this setting, and ``f_min`` is the value set in ``quality>minimum frequency``
-  Default is 2.
-  TODO: Double check this!
-
-``reference frequency``
-  The reference frequency for the waveform.
-  Quantities such as spin will be calculated at this frequency in the analysis.
-
-  
-``likelihood``
-~~~~~~~~~~~~~~
-
-These settings affect the likelihood function, and are further subdivided.
-
-``marginalization``
-"""""""""""""""""""
-
-``distance``
-  If set to true, enables distance marginalization in the analysis.
-  Default is False
-
-``distance lookup``
-  If set provides a lookup table to the distance marginalization process.
-  If not set this is calculated during the analysis.
-  By default this is not set.
-
-``maximum distance``
-  This setting is required for distance marginalization, provided in megaparsecs.
-  This is the maximum distance to be considered in the analysis.
-  Defaults to 10000 Mpc
-
-``assume``
-""""""""""
-
-Arguments in this section force the behaviour of the analysis in certain ways by making assumptions about the behaviour of the system under analysis.
-Each assumption should be provided as an item in the ``assume`` list, for example
+The ``likelihood:assume`` list forces specific physical assumptions to speed up or constrain the analysis.
+Each item in the list activates one assumption:
 
 .. code-block:: yaml
 
@@ -154,19 +177,142 @@ Each assumption should be provided as an item in the ``assume`` list, for exampl
        - no spin
        - matter
 
-would set-up an analysis where both components were assumed to have matter effects but no spin.
-	 
-``no spin``
-  If provided, this forces the analysis to ignore spin, and assume both components of the binary are non-spinning.
+.. list-table::
+   :header-rows: 1
 
-``precessing``
-  If provided, this forces the analysis to assume that both components may be spinning and may have non-aligned spins producing precession.
+   * - Value
+     - Description
+   * - ``no spin``
+     - Assume both components are non-spinning.
+   * - ``precessing``
+     - Assume spin-induced precession is possible.
+   * - ``nonprecessing``
+     - Assume spin is aligned; no precession.
+   * - ``matter``
+     - Assume both components may have matter effects (e.g. neutron stars).
+   * - ``matter secondary``
+     - Assume only the secondary component has matter effects (e.g. NSBH system).
+   * - ``eccentric``
+     - Assume the orbit may be eccentric.
+   * - ``high q``
+     - Assume a high mass-ratio system.
+   * - ``well-placed``
+     - Assume the event is well-placed for the detector network.
+   * - ``lowlatency tradeoffs``
+     - Apply low-latency performance trade-offs.
 
-``nonprecessing``
-  If provided, this forces the analysis to assume that both components' spins are aligned, and the system is not precessing.
+``sampler`` settings
+~~~~~~~~~~~~~~~~~~~~
 
-``matter``
-  If provided, this forces the analysis to assume that both components may have matter effects (e.g. a binary neutron star system).
+RIFT uses two stages of sampling — ILE (Iterative Likelihood Evaluation) and CIP
+(Constructing Inference Posteriors) — each with their own settings.
 
-``matter secondary``
-  If provided, this forces the analysis to assume that only the secondary component will have matter effects (e.g. a black hole / neutron star system).
+CIP settings
+"""""""""""""
+
+.. list-table::
+   :header-rows: 1
+   :widths: 35 15 50
+
+   * - Setting
+     - Type
+     - Description
+   * - ``sampler:cip:fitting method``
+     - str
+     - Fitting method in the CIP stage. ``"rf"`` (random forest) or ``"gp"`` (Gaussian process). Defaults to ``"rf"``.
+   * - ``sampler:cip:sampling method``
+     - str
+     - Sampling method in CIP. Options: ``"default"``, ``"GMM"``, ``"adaptive_cartesian_gpu"``. Defaults to ``"default"``.
+   * - ``sampler:cip:explode jobs``
+     - int
+     - Number of parallel CIP jobs. More jobs reduce wall-clock time. Defaults to ``3``.
+   * - ``sampler:cip:explode jobs auto``
+     - bool
+     - Automatically determine the number of CIP jobs. Defaults to ``True``.
+   * - ``sampler:use aligned phase coordinates``
+     - bool
+     - Use aligned-phase coordinates internally. Defaults to ``True``.
+   * - ``sampler:correlate parameters default``
+     - bool
+     - Use default parameter correlations. Defaults to ``True``.
+   * - ``sampler:use rescaled transverse spin coordinates``
+     - bool
+     - Use rescaled transverse spin coordinates. Defaults to ``True``.
+   * - ``sampler:force iterations``
+     - int
+     - Force a fixed number of RIFT iterations. Optional.
+
+ILE settings
+"""""""""""""
+
+.. list-table::
+   :header-rows: 1
+   :widths: 35 15 50
+
+   * - Setting
+     - Type
+     - Description
+   * - ``sampler:ile:n eff``
+     - int
+     - Target number of effective samples per ILE iteration. Defaults to ``100``.
+   * - ``sampler:ile:runtime max minutes``
+     - int
+     - Maximum runtime per ILE job in minutes. Defaults to ``700``.
+   * - ``sampler:ile:jobs per worker``
+     - int
+     - Number of likelihood evaluations per ILE worker. Defaults to ``20``.
+   * - ``sampler:ile sampling method``
+     - str
+     - Sampling method for ILE. Defaults to ``"adaptive_cartesian_gpu"``.
+   * - ``sampler:manual grid``
+     - str
+     - Path to a pre-generated initial grid file. Optional; used with ``bootstrap: manual``.
+
+``scheduler`` settings
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :header-rows: 1
+   :widths: 35 15 50
+
+   * - Setting
+     - Type
+     - Description
+   * - ``scheduler:accounting group``
+     - str
+     - HTCondor accounting group. Required on most clusters.
+   * - ``scheduler:request memory``
+     - str
+     - Memory to request per job. Defaults to ``"4.0"`` GB.
+   * - ``scheduler:osg``
+     - bool
+     - Submit to the Open Science Grid. Defaults to ``False``.
+
+Bootstrapping
+-------------
+
+RIFT supports bootstrapping a new analysis from the grid of a previous one.
+Set ``bootstrap: manual`` in the blueprint and place the grid file in the event repository
+as ``<analysis-name>_bootstrap.xml.gz``.
+
+Use a ``needs`` dependency to ensure the bootstrapping analysis completes first:
+
+.. code-block:: yaml
+
+   kind: analysis
+   name: rift-refined
+   pipeline: rift
+   comment: Refined RIFT run bootstrapped from a coarse run.
+   waveform:
+     approximant: SEOBNRv4PHM
+     reference frequency: 20
+   bootstrap: manual
+   needs:
+     - rift-coarse
+
+See also
+--------
+
+* :ref:`template-reference` — Full Liquid template variable reference
+* :ref:`blueprints` — Blueprint YAML format and settings hierarchy
+* :doc:`bayeswave` — BayesWave pipeline, commonly used to generate on-source PSDs for RIFT

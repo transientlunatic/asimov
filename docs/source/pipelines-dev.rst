@@ -1,8 +1,5 @@
-<<<<<<< HEAD
 .. _pipeline-dev:
 
-=======
->>>>>>> v0.4-release
 Developing new pipelines
 ========================
 
@@ -188,6 +185,8 @@ Pipeline Configuration Templates
 
 All of the pipelines which ``asimov`` is designed to work with use some manner of configuration file to define their operation.
 Previously, creating these configuration files could be a tedious manual process, but ``asimov`` allows these files to be *templated*, combining various pieces of data and metadata from the production ledger with a template configuration file to produce the configuration which is then used to generate the DAG files which run the analysis.
+
+A complete reference for all variables and objects available inside a template can be found in the :ref:`template-reference`.
 
 Details of the metadata stored in the ledger can be found in the :ref:`documentation for the ledger format<ledger>`.
 

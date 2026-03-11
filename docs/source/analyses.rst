@@ -27,6 +27,7 @@ Project analyses
 An analysis is defined as a series of configuration variables in an asimov project's ledger, which are then used to configure analysis pipelines.
 
 .. _states:
+
 Analysis state
 --------------
 
@@ -41,14 +42,14 @@ Under normal running conditions the sequence of these states is
 
 A number of additional states are also possible which interupt the normal flow of the job through ``asimov``'s workflow.
 
-+ ``ready`` : This job should be started automatically. This state must be applied manually. The job will then be started once its dependencies are met.
-+ ``stopped`` : This run has been manually stopped; stop tracking it. Must be applied manually. 
-+ ``stuck`` : A problem has been discovered with this run, and needs manual intervention.
-+ ``uploaded`` : This event has been uploaded to the event repository.
-+ ``restart`` : This job should be restarted by Olivaw. Must be applied manually.
-+ ``finished`` : This job has finished running and the results are ready to be processed on the next bot check.
-+ ``processing`` : The results of this job are currently being processed by ``PESummary``.
-+ ``uploaded`` : This job has been uploaded to the data store.
++ ``ready`` : This job is queued and will start automatically once its dependencies are met. Set this manually to queue a new analysis.
++ ``running`` : The job is currently executing on the cluster.
++ ``finished`` : The job has completed; results will be processed on the next monitor cycle.
++ ``processing`` : Results are being processed (e.g. by PESummary).
++ ``uploaded`` : Results have been uploaded to the data store.
++ ``stopped`` : This run has been manually stopped and will no longer be tracked. Must be set manually.
++ ``stuck`` : A problem was detected that requires manual intervention.
++ ``restart`` : The job should be restarted on the next monitor cycle. Must be set manually.
 
 
 .. note::
@@ -72,30 +73,30 @@ A blueprint to set up a default ``Bayeswave`` run is just a handful of lines lon
 
 .. code-block:: yaml
 
-		kind: analysis
-		name: sample-analysis
-		pipeline: bayeswave
-		comment: This is a simple analysis pipeline.
+        kind: analysis
+        name: sample-analysis
+        pipeline: bayeswave
+        comment: This is a simple analysis pipeline.
 
 Save this as ``bayeswave-blueprint.yaml``, and you can then add this analysis to an event in a project by running
 
 .. code-block:: console
 
-		$ asimov apply -e <subject name> -f bayeswave-blueprint.yaml
+        $ asimov apply -e <subject name> -f bayeswave-blueprint.yaml
 
 replacing ``<subject name>`` with the name of the subject you're adding the analysis to.
-		
+        
 It's also possible to make a simple analysis depend on the results of a previous analysis using the ``needs`` keyword in the blueprint.
 The pipeline ``giskard`` needs a datafile which is produced by the ``bayeswave`` pipeline defined in the first blueprint, so it can be created with this blueprint:
 
 .. code-block:: yaml
 
-		kind: analysis
-		name: stage-2-analysis
-		pipeline: giskard
-		comment: Search for evidence of gravitational wave bending.
-		needs:
-		  - sample-analysis
+        kind: analysis
+        name: stage-2-analysis
+        pipeline: giskard
+        comment: Search for evidence of gravitational wave bending.
+        needs:
+          - sample-analysis
 
 Here we defined the requirement by the *name* of the previous analysis, but we can also use various properties of the analysis.
 This can be useful if you don't want to rely on having consistent naming between events or even projects, but you want to be able to reuse a blueprint for many subjects or even many projects.
@@ -104,30 +105,30 @@ You can update the previous blueprint to always require a ``Bayeswave`` pipeline
 
 .. code-block:: yaml
 
-		kind: analysis
-		name: stage-2-analysis
-		pipeline: giskard
-		comment: Search for evidence of gravitational wave bending.
-		waveform:
-		  approximant: impecableOstritchv56PHMX
-		needs:
-		  - "pipeline:bayeswave"
+        kind: analysis
+        name: stage-2-analysis
+        pipeline: giskard
+        comment: Search for evidence of gravitational wave bending.
+        waveform:
+          approximant: IMRPhenomXPHM
+        needs:
+          - "pipeline:bayeswave"
 
 We can use any of the metadata for an analysis to create the dependencies.
-For example, we can require an analysis which used the ``impecableOstritchv56PHMX`` waveform by stating ``"waveform.approximant:impecableOstritchv56PHMX"`` in the ``needs`` section.
-		    
+For example, we can require an analysis which used the ``IMRPhenomXPHM`` waveform by stating ``"waveform.approximant:IMRPhenomXPHM"`` in the ``needs`` section.
+
 You can also define mutliple criteria for an analyses dependencies, and asimov will wait until all of the requirements are satisfied before starting.
 For example:
 
 .. code-block:: yaml
 
-		kind: analysis
-		name: stage-3-analysis
-		pipeline: calvin
-		comment: A third step analysis.
-		needs:
-		  - "pipeline:giskard"
-		  - "waveform.approximant:impecableOstritchv56PHMX"
+        kind: analysis
+        name: stage-3-analysis
+        pipeline: calvin
+        comment: A third step analysis.
+        needs:
+          - "pipeline:giskard"
+          - "waveform.approximant:IMRPhenomXPHM"
 
 Optional Dependencies
 ^^^^^^^^^^^^^^^^^^^^^
@@ -141,13 +142,13 @@ To mark a dependency as optional, use the dict format with an ``optional: true``
 
 .. code-block:: yaml
 
-		kind: analysis
-		name: flexible-analysis
-		pipeline: example
-		needs:
-		  - pipeline: bilby            # Required
-		  - optional: true             # Optional
-		    pipeline: rift
+        kind: analysis
+        name: flexible-analysis
+        pipeline: example
+        needs:
+          - pipeline: bilby            # Required
+          - optional: true             # Optional
+            pipeline: rift
 
 In this example, the analysis will only run if at least one ``bilby`` analysis is present.
 However, if a ``rift`` analysis is also available, it will be included as a dependency.
@@ -162,26 +163,26 @@ For example, PESummary can be used as a subject analysis to combine results from
 
 .. code-block:: yaml
 
-		kind: analysis
-		name: CombinedPESummary
-		pipeline: pesummary
-		analyses:
-		  - pipeline: bilby  # Combine all bilby analyses
-		refreshable: true    # Auto-update when new analyses finish
+        kind: analysis
+        name: CombinedPESummary
+        pipeline: pesummary
+        analyses:
+          - pipeline: bilby  # Combine all bilby analyses
+        refreshable: true    # Auto-update when new analyses finish
 
 The ``analyses`` field works similarly to ``needs``, but is used specifically for subject analyses to specify which simple analyses to include.
 You can also use optional dependencies in subject analyses:
 
 .. code-block:: yaml
 
-		kind: analysis
-		name: FlexiblePESummary
-		pipeline: pesummary
-		analyses:
-		  - pipeline: bilby       # Required
-		  - optional: true        # Optional
-		    pipeline: rift
-		refreshable: true
+        kind: analysis
+        name: FlexiblePESummary
+        pipeline: pesummary
+        analyses:
+          - pipeline: bilby       # Required
+          - optional: true        # Optional
+            pipeline: rift
+        refreshable: true
 
 Refreshable Analyses
 ^^^^^^^^^^^^^^^^^^^^
@@ -204,17 +205,22 @@ To create a ``gladia`` pipeline which analyses two events, ``GW150914`` and ``GW
 
 .. code-block:: yaml
 
-		kind: projectanalysis
-		name: gladia-joint
-		pipeline: gladia
-		comment: An example joint analysis.
-		subjects:
-		  - GW150914
-		  - GW151012
-		    
+        kind: projectanalysis
+        name: gladia-joint
+        pipeline: gladia
+        comment: An example joint analysis.
+        subjects:
+          - GW150914
+          - GW151012
+            
 
-Creating a Project Analysis Pipeline
-====================================
+Template variables for project analyses
+========================================
+
+.. note::
+   This section is for **pipeline developers** writing new pipeline integrations.
+   For user-facing project analysis configuration, see the examples above.
+   For a complete template variable reference, see :ref:`template-reference`.
 
 For the most part a Project Analysis pipeline is similar to a simple analysis pipeline.
 The main difference will be how you access metadata from each event.
@@ -226,18 +232,18 @@ The example below uses two subjects, and to make the sample template easier to r
 
 .. code-block:: liquid
 
-		{%- assign subject_1 = analysis.subjects[0] -%}
-		{%- assign subject_2 = analysis.subjects[1] -%}
+        {%- assign subject_1 = analysis.subjects[0] -%}
+        {%- assign subject_2 = analysis.subjects[1] -%}
 
-		[event_1_settings]
-		{%- assign ifos = subject_1.meta['interferometers'] -%}
-		channel-dict = { {% for ifo in ifos %}{{ subject_1.meta['data']['channels'][ifo] }},{% endfor %} } 
-		psd-dict = { {% for ifo in ifos %}{{ifo}}:{{subject_1.psds[ifo]}},{% endfor %} }
+        [event_1_settings]
+        {%- assign ifos = subject_1.meta['interferometers'] -%}
+        channel-dict = { {% for ifo in ifos %}{{ subject_1.meta['data']['channels'][ifo] }},{% endfor %} } 
+        psd-dict = { {% for ifo in ifos %}{{ifo}}:{{subject_1.psds[ifo]}},{% endfor %} }
 
-		[event_2_settings]
-		{%- assign ifos = subject_2.meta['interferometers'] -%}
-		channel-dict = { {% for ifo in ifos %}{{ subject_2.meta['data']['channels'][ifo] }},{% endfor %} } 
-		psd-dict = { {% for ifo in ifos %}{{ifo}}:{{subject_2.psds[ifo]}},{% endfor %} }
+        [event_2_settings]
+        {%- assign ifos = subject_2.meta['interferometers'] -%}
+        channel-dict = { {% for ifo in ifos %}{{ subject_2.meta['data']['channels'][ifo] }},{% endfor %} } 
+        psd-dict = { {% for ifo in ifos %}{{ifo}}:{{subject_2.psds[ifo]}},{% endfor %} }
 
 
 Postprocessing Workflows
@@ -254,13 +260,13 @@ As a concrete example, let's look at the blueprint for a postprocessing analysis
 
 .. code-block:: yaml
 
-		kind: postprocessing
-		name: combined summary pages for bilby
-		analyses:
-		- pipeline:bilby
-		stages:
-		- name: combined pages
-		  pipeline: pesummary
+        kind: postprocessing
+        name: combined summary pages for bilby
+        analyses:
+        - pipeline:bilby
+        stages:
+        - name: combined pages
+          pipeline: pesummary
 
 This blueprint describes postprocessing using a pipeline called ``pesummary`` which applies to all events (aka subjects) in the project, and all analyses which have "bilby" as their pipeline.
 
@@ -268,18 +274,18 @@ In contrast to a normal Analysis, it is possible to define multiple stages to a 
 
 .. code-block:: yaml
 
-		kind: postprocessing
-		name: standard pe postprocessing
-		analyses:
-		- pipeline:bilby
-		- pipeline:rift
-		stages:
-		- name: simple PE summary
-		  pipeline: pesummary
-		- name: less simple PE summary
-		  pipeline: pesummary
-		  needs:
-		  - simple PE summary
+        kind: postprocessing
+        name: standard pe postprocessing
+        analyses:
+        - pipeline:bilby
+        - pipeline:rift
+        stages:
+        - name: simple PE summary
+          pipeline: pesummary
+        - name: less simple PE summary
+          pipeline: pesummary
+          needs:
+          - simple PE summary
 
 This workflow has two stages, with ``less simple PE summary`` requiring ``simple PE summary`` to complete before it is started.
 

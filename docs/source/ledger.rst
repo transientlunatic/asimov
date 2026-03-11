@@ -3,167 +3,104 @@
 The Asimov Ledger
 =================
 
-The ledger is the central source of information within a project, and stores information about events and analyses.
+The ledger is asimov's internal database.
+It records the full configuration and current status of every event and analysis in your project.
+You will not normally need to interact with it directly — asimov creates and updates it automatically as you apply blueprints and run the monitor.
 
-Data in the ledger is hierarchical, so settings can be specified on a per-project, per-event, and per-analysis level, allowing project-wide defaults to be set, but overwritten when required.
-In addition defaults can be set for each pipeline.
+.. note::
 
-In this documentation we'll represent the ledger in ``yaml`` format, however a number of other storage methods for the ledger are also supported by asimov.
+   **The ledger is not a configuration file.**
+   Do not edit ``asimov/ledger.yml`` by hand.
+   Instead use ``asimov apply -f <blueprint.yaml>`` to make changes.
+   Direct edits bypass validation and can leave the project in an inconsistent state.
 
-The ledger hierarchy
---------------------
+This page is a reference for the structure and meaning of ledger settings.
+It is primarily useful when:
 
-Project data
-~~~~~~~~~~~~
+* Writing a new pipeline and needing to understand what data is available in ``production.meta``
+* Debugging an unexpected analysis configuration
 
-The project is the top level of the hierarchy within asimov.
-Settings which are defined for the project are passed to all events and those events' analyses.
+Settings hierarchy
+------------------
 
-Event data
-~~~~~~~~~~
+Settings in the ledger are applied in order of increasing priority:
 
-Events are stored under the ``events`` key of the ledger.
-All events are attached to a project, and they inherit all of the settings from their project.
+1. **Global defaults** — applied via a ``kind: configuration`` blueprint
+2. **Pipeline defaults** — under the ``pipelines: <name>`` key of a ``kind: configuration`` blueprint
+3. **Event settings** — in a ``kind: event`` blueprint
+4. **Analysis settings** — in a ``kind: analysis`` blueprint
 
-Analysis data
-~~~~~~~~~~~~~
-
-All analyses are attached to an event, and inherit all of the settings from their event.
-
-Pipeline data
-~~~~~~~~~~~~~
-
-In addition to specifying project or event defaults, it is possible to define per-pipeline defaults in the ``pipelines`` key of the ledger, which are only used by a specific pipeline.
-For example, you may wish to specify a different set of defaults for all ``bilby`` analyses compared to all ``rift`` analyses.
-
-Applying changes to the ledger
-------------------------------
-
-There are a number of ways that changes can be applied to the ledger, for example adding new analyses, new events, or setting defaults.
-
-1. Via the command line interface
-2. By writing a ledger page and adding it to the ledger
-3. By directly editing the ledger
-
-The first two options are the recommended approach for the vast majority of situations.
-While editing the ledger directly is the most powerful approach it also presents more risks.
+An analysis-level setting always wins over a project-level setting.
+See :ref:`blueprints` for the full precedence example and settings reference.
 
 Detector information
 --------------------
 
-Information about which detectors should be used for an analysis is contained under the ``interferometers`` key.
+The ``interferometers`` key lists the detectors used in an analysis.
+It takes a list of standard detector abbreviations:
 
-This should be a list of detector abbreviations, for example ``[H1, L1, V1]``.
+.. code-block:: yaml
 
-Examples
-~~~~~~~~
-
-In order to provide the IFO list for all analyses in a given event:
-
-.. code-block::
-
-   - name: GW150915
-     interferometers:
-     - L1
+   interferometers:
      - H1
-     productions:
-       Prod1: ...
+     - L1
+     - V1
 
-       
-Data information
-----------------
+Data settings
+-------------
 
-Information and settings about the data are stored under the ``data`` key.
+Data settings live under the ``data`` key.
 
-Examples
-~~~~~~~~
-
-.. code-block::
+.. code-block:: yaml
 
    data:
      calibration:
-       H1: h1-calibration.dat
-       L1: l1-calibration.dat
-    channels:
-      H1: H1:DCS-CALIB_STRAIN_C02
-      L1: L1:DCS-CALIB_STRAIN_C02
-    frame-types:
-      H1: H1_HOFT_C02
-      L1: L1_HOFT_C02
-    segments:
-      H1: H1:DMT-ANALYSIS_READY:1
-      L1: L1:DMT-ANALYSIS_READY:1
-    segment length: 4
+       H1: /home/cal/H1-calibration.dat
+       L1: /home/cal/L1-calibration.dat
+     channels:
+       H1: H1:DCS-CALIB_STRAIN_C02
+       L1: L1:DCS-CALIB_STRAIN_C02
+     frame types:
+       H1: H1_HOFT_C02
+       L1: L1_HOFT_C02
+     segments:
+       H1: H1:DMT-ANALYSIS_READY:1
+       L1: L1:DMT-ANALYSIS_READY:1
+     segment length: 4
 
 ``calibration``
-  This section defines the location of the calibration splines for the analysis.
-  These can either be specified relative to the event repository, or as an absolute path.
-  Files should be provided for each detector, indexed by the detector abbreviation.
-
-  For example
-  
-  ::
-     
-     data:
-       calibration:
-         H1: /home/cal/H1-calibration.dat
-	 V1: /home/cal/V1-calibration.dat
+  Location of calibration spline files, keyed by detector.
+  Can be an absolute path or a path relative to the event repository.
 
 ``channels``
-  This section defines the data channels which should be used in the analysis.
-  These should be provided for each detector.
-  For example
-  
-  ::
-     
-     data:
-       channels:
-	 H1: H1:DCS-CALIB_STRAIN_C02
-	 L1: L1:DCS-CALIB_STRAIN_C02
+  Data channel names, keyed by detector.
 
-``frame-types``
-  This section defines the frame types which should be used in the analysis.
-  These should be provided for each detector.
-  For example
-  
-  ::
-     
-     data:
-       frame-types:
-	 H1: H1_HOFT_C02
-	 L1: L1_HOFT_C02
+``frame types``
+  Frame type names used for data access, keyed by detector.
 
 ``segments``
-  This section defines the segments which should be used in the analysis.
-  These should be provided for each detector.
-  For example
-  
-  ::
-     
-     data:
-       segments:
-	 H1: H1:DMT-ANALYSIS_READY:1
-	 L1: L1:DMT-ANALYSIS_READY:1
+  Segment flag definitions, keyed by detector.
+
+``segment length``
+  Length of the analysis segment in seconds.
 
 ``data files``
-  This section should define data files which contain the analysis data to be used
-  in the analysis, and should be provided for each detector.
-  For example
-  
-  ::
-     
+  Pre-downloaded frame files, keyed by detector.
+  Use when frame data is not available from CVMFS or GraceDB.
+
+  .. code-block:: yaml
+
      data:
        data files:
          H1: ./H1-file.gwf
-	 L1: ./L1-file.gwf
-	 
-Data quality information
-------------------------
+         L1: ./L1-file.gwf
 
-Examples
-~~~~~~~~
+Data quality settings
+---------------------
 
-.. code-block::
+Data quality settings live under the ``quality`` key.
+
+.. code-block:: yaml
 
    quality:
      minimum frequency:
@@ -176,115 +113,64 @@ Examples
 Likelihood settings
 -------------------
 
-Examples
-~~~~~~~~
-
-.. code-block::
-
-   likelihood:
-   
-     psd length: 4
-     reference frequency: 20
-     sample rate: 2048
-     segment start: 1126259460.391
-     start frequency: 13.333333333333334
-     window length: 4
-
-Sampler settings
-----------------
-
-Examples
-~~~~~~~~
+Likelihood settings live under the ``likelihood`` key.
+These control how the likelihood function is constructed.
+For more detail on all likelihood settings see :ref:`blueprints`.
 
 .. code-block:: yaml
 
-		scheduler:
-  		  accounting group: ligo.dev.o4.cbc.pe.bilby
-		  request cpus: 4
-
-
+   likelihood:
+     psd length: 4
+     reference frequency: 20
+     sample rate: 2048
+     segment start: 1126259462.391
+     start frequency: 13.333333333333334
+     window length: 4
 
 Prior settings
 --------------
 
-Examples
-~~~~~~~~
+Prior settings live under the ``priors`` key.
+See :doc:`priors` for a full reference.
 
 .. code-block:: yaml
 
-    priors:
-      chirp mass:
-	type: UniformInComponentsChirpMass
-	minimum: 0
-	maximum: 100
-      mass ratio:
-	type: UniformInComponentsMassRatio
-	minimum: 0.1
-	maximum: 1.0
-      mass 1:
-	type: Constraint
-	minimum: 0
-	maximum: 1
-      mass 2:
-	type: Constraint
-	minimum: 0
-	maximum: 1
-      spin 1:
-	type: Uniform
-	minimum: 0
-	maximum: 1
-      spin 2:
-	type: Uniform
-	minimum: 0
-	maximum: 1
-      tilt 1:
-	type: Sine
-      tilt 2:
-	type: Sine
-      phi 12:
-	type: Uniform
-      phi jl:
-	type: Uniform
-      luminosity distance:
-	type: PowerLaw
-	minimum: 0
-	maximum: 1000
-	alpha: 2
-      dec:
-	type: Cosine
-      ra:
-	type: Uniform
-      theta jn:
-	type: Sine
-      psi:
-	type: Uniform
-      phase:
-	type: Uniform
-	boundary: periodic
+   priors:
+     chirp mass:
+       type: UniformInComponentsChirpMass
+       minimum: 10
+       maximum: 100
+     mass ratio:
+       type: UniformInComponentsMassRatio
+       minimum: 0.1
+       maximum: 1.0
+     luminosity distance:
+       type: PowerLaw
+       minimum: 10
+       maximum: 3000
+       alpha: 2
 
 Postprocessing settings
 -----------------------
 
-Examples
-~~~~~~~~
+Postprocessing settings live under the ``postprocessing`` key.
 
 .. code-block:: yaml
 
-
-		postprocessing:
-		  pesummary:
-		    accounting group: ligo.dev.o4.cbc.pe.lalinference
-		    cosmology: Planck15_lal
-		    evolve spins: forward
-		    multiprocess: 4
-		    redshift: exact
-		    regenerate posteriors:
-		    - redshift
-		    - mass_1_source
-		    - mass_2_source
-		    - chirp_mass_source
-		    - total_mass_source
-		    - final_mass_source
-		    - final_mass_source_non_evolved
-		    - radiated_energy
-		    skymap samples: 2000
+   postprocessing:
+     pesummary:
+       accounting group: ligo.dev.o4.cbc.pe.lalinference
+       cosmology: Planck15_lal
+       evolve spins: forward
+       multiprocess: 4
+       redshift: exact
+       regenerate posteriors:
+         - redshift
+         - mass_1_source
+         - mass_2_source
+         - chirp_mass_source
+         - total_mass_source
+         - final_mass_source
+         - final_mass_source_non_evolved
+         - radiated_energy
+       skymap samples: 2000

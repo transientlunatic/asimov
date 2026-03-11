@@ -4,109 +4,238 @@
 Storage Interface
 =================
 
-In order to ensure the veracity of results files asimov implements an interface for storing results files from pipelines.
+In order to ensure the veracity of results files, asimov implements an interface
+for storing results files from pipelines.
 
-Results are stored in directories called ``Stores`` and when checked in and out of the directory they are verified by comparing their MD5 hash to the hash which was recorded when the file was originally stored. Additional safety can be guaranteed by asserting that the file match an externally provided hash.
+Results are stored in directories called **Stores**.
+When files are checked in and out they are verified by comparing their MD5 hash to
+the hash recorded when the file was originally stored.
+Additional safety can be guaranteed by asserting that the file matches an externally
+provided hash.
 
-The storage interface for asimov was developed to replace the need for ``git`` to store large results files, while guaranteeing that the data contained within the files had not been edited or corrupted after production.
-Files stored in a store are stored on the principle of write-once-read-only; when a file is stored it is intended to never be editted.
-This follows the overall philosophy of the productions system of asimov, where an analysis should be created as a new production if changes must be made in order to ensure changes can be tracked efficiently.
+The storage interface was developed to replace the need for ``git`` to store large
+results files, while guaranteeing that file content has not been edited or corrupted
+after production.
+Files stored in a Store are write-once-read-only; once a file is stored it is never
+edited.
+This follows the overall asimov philosophy: if changes must be made, create a new
+analysis rather than overwriting existing results.
 
-Using Stores
-------------
+When to Use the Store vs. the Event Git Repository
+----------------------------------------------------
 
-Stores can be accessed either through the python API in ``asimov.storage`` or via a command line interface, ``locutus``, which allows stores to be manipulated from a command line.
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Use the **Store**
+     - Use the **event git repository**
+   * - Large results files (posterior samples, PSD files, summary pages)
+     - Configuration files, blueprints, small input data
+   * - Files that must be read-only after they are created
+     - Files that are iterated on during development
+   * - Content-addressed access by UUID (integrity-checked retrieval)
+     - Version-controlled access by git history
+   * - Pipeline output artefacts
+     - Pipeline input templates, scripts
+
+---
 
 Python API
 ----------
 
-The python API for asimov Stores can be found in the ``asimov.storage`` module.
-This implements two classes, ``asimov.storage.Manifest`` and ``asimov.storage.Store``. The former handles the management of manifest files, which record the contents of the Stores, and the latter handles file system operations, and the process of storing files.
+The Python API lives in ``asimov.storage``.
+The two main classes are:
 
+* :class:`~asimov.storage.Store` — file-system operations and file management
+* :class:`~asimov.storage.Manifest` — low-level manifest file handling
+  (you do not normally need to use this directly)
 
 Creating a store
 ~~~~~~~~~~~~~~~~
 
-A new Store can be created with the class method ``Store.create``. For example:
-
-::
+.. code-block:: python
 
    from asimov.storage import Store
 
-   new_store = Store.create("/tmp/test_store", "Test Store")
+   store = Store.create("/data/results/my_store", "My Store")
 
-Stores must be assigned a root directory and a name when they are created.
-This method then creates a new directory, ``.manifest`` in the store's root directory, which will handle the recording of files in the directory.
+``Store.create`` creates the directory and a ``.manifest`` subdirectory that tracks
+all files in the store.
 
 Storing a file
 ~~~~~~~~~~~~~~
 
-A new file can be added to the store with the ``Store.add_file`` method.
-This method assigns a uuid to the file, copies it into the store, using the uuid as its name, and makes the file read-only.
-The hash of the file is then stored in the ``Store`` manifest.
+Use :meth:`~asimov.storage.Store.add_file` to check a file into the store.
+Files are organised in a three-level hierarchy: ``event / production / filename``.
 
-Stores require that files be maintained in a hierarchy containing the event and production which the file relates to, however files intended to be shared between productions may be stored as a production named ``shared``. For example
-
-::
+.. code-block:: python
 
    from asimov.storage import Store
 
-   new_store = Store.create("/tmp/test_store", "Test Store")
+   store = Store("/data/results/my_store")
 
-   new_store.add_file("S000000xx", "Prod0", "test_results.xml")
+   record = store.add_file("GW150914_095045", "pe-bilby", "posterior_samples.hdf5")
+   print(record)
+   # {'uuid': 'f9f167be-e8e3-449a-a0c6-8bf7f91e7b7a', 'hash': 'd41d8cd9...'}
 
+The returned dictionary contains the UUID and MD5 hash.
+Store these in the analysis ledger or a database if you need to retrieve the file
+later by UUID.
 
-The returned value of ``.add_file`` will be a dictionary which contains the uuid and the hash of the file, which can be stored elsewhere, for example in a production ledger.
+A file named ``shared`` can be used for resources shared between multiple analyses:
+
+.. code-block:: python
+
+   store.add_file("GW150914_095045", "shared", "calibration.hdf5")
 
 Retrieving a file
 ~~~~~~~~~~~~~~~~~
 
-Files should be retrieved from a store using the ``Store.fetch_file`` method, which looks up the file's uuid, and checks the hash of the returned file against the record in the manifest.
-For example:
+Use :meth:`~asimov.storage.Store.fetch_file` to retrieve a file.
+The method looks up the UUID, copies the file to the current directory, and checks
+its MD5 hash against the manifest:
 
-::
+.. code-block:: python
 
-   from asimov.storage import Store
-   old_store = Store("/tmp/test_store")
+   store = Store("/data/results/my_store")
 
-   old_store.fetch_file("S000000xx", "Prod0", "test_results.xml")
+   store.fetch_file("GW150914_095045", "pe-bilby", "posterior_samples.hdf5")
 
-It is possible to pass a hash to this method, in which case the hash of the file is also checked against the provided hash. For example:
+Optionally pass an expected hash to perform an additional integrity check:
 
-::
+.. code-block:: python
 
-   from asimov.storage import Store
-   old_store = Store("/tmp/test_store")
+   store.fetch_file(
+       "GW150914_095045", "pe-bilby", "posterior_samples.hdf5",
+       hash="d41d8cd98f00b204e9800998ecf8427e"
+   )
 
-   old_store.fetch_file("S000000xx", "Prod0", "test_results.xml", hash="dfksdjfklsdjfklsdjdf")
+If any hash check fails, :exc:`~asimov.storage.HashError` is raised and the file
+is not returned.
 
-If any of the hash checks for the file fail a ``asimov.storage.HashError`` exception will be raised rather than the file being returned.
-   
-Locutus
--------
+---
 
-Locutus is designed to provide a simple user interface to the storage API which can be used at the command line. When ``asimov`` is installed ``locutus`` will also be installed.
+The ``locutus`` CLI
+--------------------
 
-..
-   .. click:: module:parser
-      :prog: locutus
-      :nested: full
+``locutus`` is a command-line interface to the storage API.
+It is installed alongside ``asimov``.
+
+All ``locutus`` commands must be run from inside the Store directory (the one
+containing the ``.manifest`` subdirectory), or from a directory that has a Store
+configured in the asimov project settings.
+
+.. code-block:: console
+
+   $ locutus --help
+   Usage: locutus [OPTIONS] COMMAND [ARGS]...
+
+   Commands:
+     init   Initialise a new Store
+     store  Store a file in the Store.
+     fetch  Fetch a file from an event production.
+     list   List files stored for an event production.
+     info   Check the information about this Store.
+
+``locutus init``
+~~~~~~~~~~~~~~~~~
+
+Initialise a new Store in the current directory:
+
+.. code-block:: console
+
+   $ locutus init --name "GWTC-3 Results"
+
+Options:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Option
+     - Description
+   * - ``--name TEXT``
+     - Human-readable name for the store.
+
+``locutus store``
+~~~~~~~~~~~~~~~~~
+
+Add a file to the store:
+
+.. code-block:: console
+
+   $ locutus store GW150914_095045 pe-bilby posterior_samples.hdf5
+
+Arguments: ``EVENT  PRODUCTION  FILENAME``
+
+``locutus fetch``
+~~~~~~~~~~~~~~~~~
+
+Retrieve a file from the store into the current directory:
+
+.. code-block:: console
+
+   $ locutus fetch GW150914_095045 pe-bilby posterior_samples.hdf5
+
+Optionally verify against a known hash:
+
+.. code-block:: console
+
+   $ locutus fetch GW150914_095045 pe-bilby posterior_samples.hdf5 \
+       --hash d41d8cd98f00b204e9800998ecf8427e
+
+Arguments: ``EVENT  PRODUCTION  FILENAME``
+
+Options:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Option
+     - Description
+   * - ``--hash TEXT``
+     - Optional expected MD5 hash. Raises an error if the retrieved file does not match.
+
+``locutus list``
+~~~~~~~~~~~~~~~~
+
+List all files stored for a given event and production:
+
+.. code-block:: console
+
+   $ locutus list GW150914_095045 pe-bilby
+
+Arguments: ``EVENT  PRODUCTION``
+
+``locutus info``
+~~~~~~~~~~~~~~~~
+
+Print information about the current Store:
+
+.. code-block:: console
+
+   $ locutus info
+
+---
 
 Manifest files
 --------------
 
-Manifest files are used to track changes within the repository, and store details of all of the files which are stored in the store.
+A manifest file (``.manifest/manifest.yml`` inside the store root) records every
+file that has been checked in.
+The format is a YAML hierarchy:
 
-Manifest files are YAML 1.1 files which store details of files in a simple hierarchy:
+.. code-block:: yaml
 
-::
-   
-   name: Store's name
+   name: My Store
    events:
-      S000000xx:
-         Prod0:
-            test_file:
-               hash: d41d8cd98f00b204e9800998ecf8427e
-               uuid: f9f167bee8e3449aa0c68bf7f91e7b7a
+     GW150914_095045:
+       pe-bilby:
+         posterior_samples.hdf5:
+           hash: d41d8cd98f00b204e9800998ecf8427e
+           uuid: f9f167be-e8e3-449a-a0c6-8bf7f91e7b7a
 
-A python object (``asimov.storage.Manifest``) is provided to make working with manifest files easier, although normally you shouldn't need to interact directly with the store's manifest.
+The :class:`~asimov.storage.Manifest` Python class provides helpers for reading and
+writing manifests, but under normal usage you do not need to interact with it directly.

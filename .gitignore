@@ -12,6 +12,12 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 
+# Javascript
+asimov/cli/js/node_modules
+
+# Environments
+.venv-simple/
+
 # Flask stuff:
 instance/
 .webassets-cache
