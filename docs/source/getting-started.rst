@@ -18,6 +18,7 @@ You'll need to have asimov installed first; you can find information about doing
 .. steps::
 
    .. step::  Create a new asimov project
+      
       Asimov projects are used to keep all of the data required to construct analyses, and all of the results they produce, together in one organised place.
       Any directory can be turned into an asimov project, but it's always best to start in a new, empty directory for simplicity.
 
@@ -87,6 +88,7 @@ You'll need to have asimov installed first; you can find information about doing
       In the next step we'll add some analyses to the event, but initially there are none, as reported here.
 
    .. step:: Adding some analyses
+
       Now that we've told asimov about the event we want to analyse, we need to tell it *how* to analyse it.
       The specification for an individual, self-contained analysis will specify the pipeline which should be used for the analysis, and any other settings which are specific to this analysis.
       For this guide we'll set up two analyses which were used in the production of the GWTC-2.1 catalogue paper, but not change any of the settings beyond this.
