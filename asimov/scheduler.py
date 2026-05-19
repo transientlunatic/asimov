@@ -12,9 +12,9 @@ Supported Schedulers are:
 import os
 import re
 import shlex
-import signal
 import subprocess
 import tempfile
+import threading
 import datetime
 import yaml
 import warnings
@@ -961,11 +961,67 @@ class LocalProcessScheduler(Scheduler):
     exceeds the actual job runtime.  Jobs are launched as background
     subprocesses on the machine running asimov and are tracked by their
     operating-system process ID (PID).
+
+    Notes
+    -----
+    The ``log`` field of a :class:`JobDescription` is not used by this
+    scheduler; only ``output`` (stdout) and ``error`` (stderr) are redirected.
+
+    Security note: the ``executable`` field is passed directly to the OS
+    without further sanitisation.  Only trusted, application-constructed
+    :class:`JobDescription` objects should be submitted.
     """
 
     def __init__(self):
         """Initialize the local process scheduler."""
         self._processes = {}  # pid -> {"process": Popen, "command": str, "name": str}
+        self._lock = threading.Lock()
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _reap_completed(self):
+        """
+        Remove completed processes from the internal tracking dict.
+
+        This prevents the dict from growing without bound and avoids zombie
+        processes accumulating on platforms that require explicit reaping.
+        Called automatically at the start of :meth:`query` and
+        :meth:`submit`.
+        """
+        with self._lock:
+            done = [
+                pid
+                for pid, info in self._processes.items()
+                if info["process"].poll() is not None
+            ]
+            for pid in done:
+                del self._processes[pid]
+
+    def wait_for_job(self, job_id):
+        """
+        Block until the process identified by *job_id* has exited.
+
+        Parameters
+        ----------
+        job_id : int
+            The PID returned by :meth:`submit`.
+
+        Returns
+        -------
+        int or None
+            The process exit code, or ``None`` if the job is not tracked.
+        """
+        with self._lock:
+            info = self._processes.get(job_id)
+        if info is None:
+            return None
+        return info["process"].wait()
+
+    # ------------------------------------------------------------------
+    # Scheduler interface
+    # ------------------------------------------------------------------
 
     def submit(self, job_description):
         """
@@ -976,7 +1032,10 @@ class LocalProcessScheduler(Scheduler):
         job_description : JobDescription or dict
             The job description to submit.  At minimum the description must
             supply an ``executable``.  The optional keys ``arguments``,
-            ``output``, and ``error`` are also recognised.
+            ``output``, and ``error`` are also recognised.  The ``log`` key
+            is accepted but ignored (not applicable to local subprocesses).
+            Arguments are parsed with :func:`shlex.split` so quoted strings
+            and paths that contain spaces are handled correctly.
 
         Returns
         -------
@@ -1009,16 +1068,25 @@ class LocalProcessScheduler(Scheduler):
             raise RuntimeError("No executable specified in job description")
 
         if arguments:
-            command = (
-                [executable] + arguments.split()
-                if isinstance(arguments, str)
-                else [executable] + list(arguments)
-            )
+            if isinstance(arguments, str):
+                command = [executable] + shlex.split(arguments)
+            else:
+                command = [executable] + list(arguments)
         else:
             command = [executable]
 
+        # Open file handles before forking so that any IOError surfaces here
+        # rather than being silently lost inside Popen.
         stdout_handle = open(output_file, "w") if output_file else subprocess.DEVNULL
-        stderr_handle = open(error_file, "w") if error_file else subprocess.DEVNULL
+        try:
+            stderr_handle = (
+                open(error_file, "w") if error_file else subprocess.DEVNULL
+            )
+        except OSError:
+            # `open()` and all subclasses of OSError (including PermissionError) are caught.
+            if stdout_handle is not subprocess.DEVNULL:
+                stdout_handle.close()
+            raise
 
         try:
             proc = subprocess.Popen(command, stdout=stdout_handle, stderr=stderr_handle)
@@ -1034,11 +1102,12 @@ class LocalProcessScheduler(Scheduler):
             if stderr_handle is not subprocess.DEVNULL:
                 stderr_handle.close()
 
-        self._processes[proc.pid] = {
-            "process": proc,
-            "command": " ".join(command),
-            "name": name,
-        }
+        with self._lock:
+            self._processes[proc.pid] = {
+                "process": proc,
+                "command": " ".join(command),
+                "name": name,
+            }
         return proc.pid
 
     def delete(self, job_id):
@@ -1048,23 +1117,38 @@ class LocalProcessScheduler(Scheduler):
         Parameters
         ----------
         job_id : int
-            The PID of the process to terminate.
+            The PID of the process to terminate.  Only PIDs that were
+            returned by :meth:`submit` on *this* scheduler instance are
+            acted upon; unknown PIDs are ignored with a warning to avoid
+            accidentally killing unrelated OS processes.
         """
-        if job_id in self._processes:
-            proc = self._processes[job_id]["process"]
+        with self._lock:
+            info = self._processes.pop(job_id, None)
+
+        if info is None:
+            warnings.warn(
+                f"LocalProcessScheduler.delete called with unknown job_id {job_id}; "
+                "no process was terminated.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            return
+
+        proc = info["process"]
+        try:
+            proc.terminate()
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
             try:
-                proc.terminate()
-                proc.wait(timeout=5)
-            except subprocess.TimeoutExpired:
                 proc.kill()
                 proc.wait()
-            finally:
-                del self._processes[job_id]
-        else:
-            try:
-                os.kill(job_id, signal.SIGTERM)
             except (ProcessLookupError, PermissionError):
+                # ProcessLookupError: process exited between kill() and wait().
+                # PermissionError: insufficient privileges (should not normally occur).
                 pass
+        except (ProcessLookupError, PermissionError):
+            # Process already exited before terminate() was called.
+            pass
 
     def query(self, job_id=None):
         """
@@ -1074,27 +1158,36 @@ class LocalProcessScheduler(Scheduler):
         ----------
         job_id : int, optional
             The PID to query.  If *None*, all tracked processes are returned.
+            If the PID is not known to this scheduler instance, an empty list
+            is returned.
 
         Returns
         -------
         list of dict
             Each dictionary contains ``id``, ``command``, ``hosts``, and
-            ``status`` keys compatible with :class:`JobList`.
+            ``status`` keys compatible with :class:`JobList`.  Completed
+            processes are removed from internal tracking after being reported.
         """
+        with self._lock:
+            pids = [job_id] if job_id is not None else list(self._processes.keys())
+
         results = []
-        pids = [job_id] if job_id is not None else list(self._processes.keys())
+        completed_pids = []
 
         for pid in pids:
-            if pid not in self._processes:
+            with self._lock:
+                proc_info = self._processes.get(pid)
+            if proc_info is None:
                 continue
-            proc_info = self._processes[pid]
             poll = proc_info["process"].poll()
             if poll is None:
                 status = "running"
             elif poll == 0:
                 status = "completed"
+                completed_pids.append(pid)
             else:
                 status = f"error (exit {poll})"
+                completed_pids.append(pid)
             results.append(
                 {
                     "id": pid,
@@ -1104,6 +1197,12 @@ class LocalProcessScheduler(Scheduler):
                     "name": proc_info.get("name", "asimov job"),
                 }
             )
+
+        # Remove completed processes to prevent memory leaks and zombie accumulation.
+        with self._lock:
+            for pid in completed_pids:
+                self._processes.pop(pid, None)
+
         return results
 
     def submit_dag(self, dag_file, batch_name=None, **kwargs):
@@ -1385,6 +1484,11 @@ def get_scheduler(scheduler_type="htcondor", **kwargs):
     elif scheduler_type == "slurm":
         return Slurm(**kwargs)
     elif scheduler_type == "local":
+        if kwargs:
+            unexpected = ", ".join(sorted(kwargs.keys()))
+            raise TypeError(
+                f"LocalProcessScheduler does not accept configuration options: {unexpected}"
+            )
         return LocalProcessScheduler()
     else:
         raise ValueError(f"Unknown scheduler type: {scheduler_type}")
