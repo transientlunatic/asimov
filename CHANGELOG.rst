@@ -1,5 +1,49 @@
-Unreleased
-==========
+0.7.0-beta1
+===========
+
+This is the first beta release of asimov 0.7, building on the alpha releases
+with first-class Slurm support, a hardened report system, and a number of
+event-application and ledger bug fixes.  The architectural changes introduced
+in the alpha series (state machine monitor, flexible dependency system, Python
+API, pydantic priors) are now considered stable for beta testing.
+
+New Features
+------------
+
+**First-class Slurm Scheduler Support**
+  Asimov now ships with a full Slurm scheduler backend.  The implementation
+  includes bidirectional DAG translation (HTCondor ↔ Slurm), so workflow
+  graphs defined for one scheduler can be executed on the other without
+  changes to the blueprint.  End-to-end CI coverage for Slurm has been added
+  alongside the existing HTCondor suite.
+
+Improvements
+------------
+
+**Hardened HTML Report Pages**
+  The HTML report system has been substantially improved and hardened.  Subject
+  analysis reports now render correctly, graph data generation has been
+  refactored for correctness, and the overall report layout has been polished.
+
+**CBCFlow Integration Tests**
+  Integration tests for CBCFlow have been added, and ``apply_via_plugin`` has
+  been updated to use the current ledger state rather than a stale snapshot.
+
+**Enhanced Scheduler Testing Pipelines**
+  Scheduler support and its associated testing pipelines have been further
+  extended and hardened following the initial Slurm integration.
+
+Bug Fixes
+---------
+
+**Event Application Reliability**
+  Several bugs in the event-apply path have been fixed, covering analysis
+  application ordering, ledger persistence during apply, and edge cases in
+  the event update workflow.
+
+**Ledger I/O Fix**
+  A bug in ledger reading and writing that could corrupt state under certain
+  conditions has been corrected.
 
 Breaking Changes
 ----------------
@@ -34,12 +78,40 @@ Breaking Changes
 GitHub Pull Requests
 --------------------
 
++ `github#86 <https://github.com/etive-io/asimov/pull/86>`_: Add first-class Slurm scheduler support with bidirectional DAG translation and end-to-end CI coverage
++ `github#103 <https://github.com/etive-io/asimov/pull/103>`_: Fix the application of analyses
 + `github#107 <https://github.com/etive-io/asimov/pull/107>`_: Enforce waveform minimum frequency location (breaking change for old blueprints)
++ `github#112 <https://github.com/etive-io/asimov/pull/112>`_: Fix ledger I/O
++ `github#115 <https://github.com/etive-io/asimov/pull/115>`_: Fix event apply
++ `github#116 <https://github.com/etive-io/asimov/pull/116>`_: Add CBCFlow integration tests and update apply_via_plugin to use current ledger
++ `github#117 <https://github.com/etive-io/asimov/pull/117>`_: Refactor event rendering and improve graph data generation
++ `github#118 <https://github.com/etive-io/asimov/pull/118>`_: Fix event apply (follow-up)
++ `github#121 <https://github.com/etive-io/asimov/pull/121>`_: Enhance scheduler support and testing pipelines
++ `github#122 <https://github.com/etive-io/asimov/pull/122>`_: Fix Slurm tests
++ `github#123 <https://github.com/etive-io/asimov/pull/123>`_: Improve and harden the report page
++ `github#124 <https://github.com/etive-io/asimov/pull/124>`_: Fix subject report
 
 0.7.0-alpha2
 ============
 
-This is a major feature release that represents a significant evolution of asimov's architecture and capabilities. This alpha release introduces powerful new workflow management features, a modernized monitoring system, and enhanced programmatic control.
+This is a bug-fix release on top of 0.7.0-alpha1.
+
+Bug Fixes
+---------
+
+**Git Repository Initialisation**
+  Fixes an issue with ``git init`` during project creation that could cause
+  project setup to fail in some environments.
+
+GitHub Pull Requests
+--------------------
+
++ `github#97 <https://github.com/etive-io/asimov/pull/97>`_: Fix issue with git init in project creation
+
+0.7.0-alpha1
+============
+
+This is the first alpha of a major feature release representing a significant evolution of asimov's architecture and capabilities. It introduces powerful new workflow management features, a modernised monitoring system, and enhanced programmatic control.
 
 Major New Features
 ------------------
@@ -132,7 +204,6 @@ GitHub Pull Requests
 + `github#75 <https://github.com/etive-io/asimov/pull/75>`_: Add strategy expansion for creating multiple analyses from parameter matrices
 + `github#76 <https://github.com/etive-io/asimov/pull/76>`_: Allow additional plugin flexibility
 + `github#83 <https://github.com/etive-io/asimov/pull/83>`_: Refactor file logging setup to ensure thread safety with a shared lock
-+ `github#97 <https://github.com/etive-io/asimov/pull/97>`_: Fix issue with git init in project creation
 
 0.6.1
 =====
@@ -184,7 +255,40 @@ Merges and fixes
 + `ligo!128 <https://git.ligo.org/asimov/asimov/-/merge_requests/128>`_: Updates to the README
 + `ligo!157 <https://git.ligo.org/asimov/asimov/-/merge_requests/157>`_: Fixes to the interface between asimov and lensingflow
 
+0.5.12
+======
 
+This is a bug-fix and backport release for the v0.5 maintenance branch.
+
+Breaking changes
+----------------
+
+This release is not believed to introduce any backwards-incompatible changes.
+
+Merges
+------
+
++ `ligo!179 <https://git.ligo.org/asimov/asimov/-/merge_requests/179>`_: Backport ledger updates and post-monitor hooks from the v0.7 development series.
++ Update HTCondor test configuration.
++ Update GWOSC YAML configuration for gravitational wave event analysis.
+
+0.5.11
+======
+
+This is a bug-fix release for the v0.5 maintenance branch.
+
+Breaking changes
+----------------
+
+This release is not believed to introduce any backwards-incompatible changes.
+
+Merges
+------
+
++ `ligo!172 <https://git.ligo.org/asimov/asimov/-/merge_requests/172>`_: PESummary fixes correcting configuration errors in post-processing.
++ Backport bilby configuration changes from more recent releases.
++ Fix the ``asimov review`` CLI.
++ Add security testing to the CI build.
 
 0.5.10
 ======
@@ -549,3 +653,128 @@ What's next?
 ------------
 
 You can find the most up to date O4 development roadmap `on the project wiki<https://git.ligo.org/asimov/asimov/-/wikis/o4-roadmap>`.
+
+0.3.4
+=====
+
+This is a maintenance release with packaging, documentation, and CI updates. It corrects the package name on PyPI and updates the documentation build configuration and CI pipelines.
+
+Breaking changes
+----------------
+
+This release is not believed to introduce any backwards-incompatible changes.
+
+0.3.3
+=====
+
+This is a minor update release.
+
+Changes
+-------
+
+*LALInference templating*: Updates the handling of LALInference pipelines to allow analysis configuration to be expressed using Liquid templates, providing greater flexibility in how pipeline configurations are generated.
+
+Bug Fixes
+---------
+
+*Review information*: Corrects a bug in the handling of review information stored in the ledger.
+
+0.3.2
+=====
+
+This is a minor bug-fix release.
+
+Breaking changes
+----------------
+
+This release is not believed to introduce any backwards-incompatible changes.
+
+Bug Fixes
+---------
+
+*PESummary spin evolution*: Corrects a bug in the PESummary post-processing call which prevented spin evolution from being correctly calculated.
+
+0.3.1
+=====
+
+This is a minor bug-fix release.
+
+Breaking changes
+----------------
+
+This release is not believed to introduce any backwards-incompatible changes.
+
+Bug Fixes
+---------
+
+*PESummary*: Adds redshift regeneration to the PESummary call at production completion.
+
+*Bayeswave*: Removes writing of user information to Bayeswave productions in the ledger.
+
+0.3.0
+=====
+
+This is the first fully reviewed version of asimov, representing the state of the codebase at the O3a_final review.
+
+Reviewed support for bilby, RIFT, and Bayeswave job creation, as well as operability on LIGO Data Grid (LDG) computing resources. This version was prepared for the O3a and O3b parameter estimation projects.
+
+Breaking changes
+----------------
+
+This release is not believed to introduce any backwards-incompatible changes relative to the 0.2 series.
+
+0.2.2
+=====
+
+Review version for the O3a final analyses. This release was used as the basis for the O3a final parameter estimation analyses and underwent internal LVK review for that purpose.
+
+Breaking changes
+----------------
+
+This release is not believed to introduce any backwards-incompatible changes.
+
+Bug Fixes
+---------
+
+*PSD suppression*: Corrects bugs in the PSD suppression code.
+
+*Connectivity*: Removes the requirement to connect to GitLab when no connection is necessary (e.g. for local read-only operations).
+
+*Requirements*: Cleans up package requirements specifications.
+
+0.2.1
+=====
+
+This is a bug-fix release.
+
+Breaking changes
+----------------
+
+This release is not believed to introduce any backwards-incompatible changes.
+
+Bug Fixes
+---------
+
++ Various bug fixes and stability improvements, including a correction to DAG construction and updates to bring the codebase in line with O3b operational requirements.
+
+0.2.0
+=====
+
+This is a major release intended as a fully functional version for O3b parameter estimation analyses.
+
+Asimov 0.2 represents a significant step towards production-ready workflow automation for LIGO parameter estimation, building on the O3a experience to provide a more robust and capable system.
+
+Breaking changes
+----------------
+
+This release introduces changes that may not be fully backwards compatible with the 0.1 series.
+
+0.1
+===
+
+This is the O3a reviewed version of asimov — the initial reviewed release, prepared for use in O3a parameter estimation analyses on the LIGO Data Grid.
+
+0.0.1
+=====
+
+Initial release of asimov.
