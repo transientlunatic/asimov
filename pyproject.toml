@@ -63,7 +63,7 @@ docs = [
 	"sphinxcontrib-httpexample",
 	"sphinx-jsonschema",
 	"sphinx-multiversion",
-	"sphinxcontrib.autodoc_pydantic",
+	"autodoc-pydantic",
 ]
 bilby = [
 	"bilby_pipe",
