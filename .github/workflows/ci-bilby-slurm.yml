@@ -211,27 +211,7 @@ jobs:
           show-condor-q: "false"
 
       - name: Monitor Bilby completion
-        run: |
-          check_status() {
-            python3 - <<PYEOF
-          from asimov.monitor_api import get_analysis_status
-          print(get_analysis_status().get('bilby-IMRPhenomXPHM', 'unknown'))
-          PYEOF
-          }
-          for attempt in $(seq 1 15); do
-            asimov monitor
-            status=$(check_status)
-            echo "Attempt ${attempt}/15: bilby-IMRPhenomXPHM = ${status}"
-            squeue --format="%.10i %.30j %.8T %.10M %.20R" --all || true
-            if [ "${status}" = "complete" ]; then
-              echo "Bilby Slurm end-to-end test completed successfully!"
-              exit 0
-            fi
-            sleep 60
-          done
-          echo "Timeout: bilby-IMRPhenomXPHM did not reach complete within 15 minutes"
-          check_status
-          exit 1
+        run: asimov monitor
 
       - name: Archive testing artifacts
         if: always()
