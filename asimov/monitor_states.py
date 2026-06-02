@@ -197,11 +197,14 @@ class RunningState(MonitorState):
             if job_id:
                 try:
                     analysis.meta["profiling"] = condor.collect_history(job_id)
-                    context.clear_job_id()
-                    context.update_ledger()
-                except ValueError as e:
+                except ValueError:
+                    logger.warning("Could not collect condor profiling data: no history record found.")
+                except Exception as e:
                     logger.warning("Could not collect condor profiling data.")
                     logger.exception(e)
+                finally:
+                    context.clear_job_id()
+                    context.update_ledger()
             
             analysis.status = "finished"
             pipe.after_completion()

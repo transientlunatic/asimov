@@ -13,7 +13,6 @@ Note: This module now uses the asimov.scheduler module internally for improved
 import os
 import datetime
 import configparser
-from dateutil import tz
 
 
 import warnings
@@ -33,29 +32,10 @@ import yaml
 from asimov import config, logger, LOGGER_LEVEL
 from asimov.scheduler import HTCondor as HTCondorScheduler
 
-UTC = tz.tzutc()
 
 logger = logger.getChild("condor")
 logger.setLevel(LOGGER_LEVEL)
 
-
-def datetime_from_epoch(dt, tzinfo=UTC):
-    """Returns the `datetime.datetime` for a given Unix epoch
-
-    Parameters
-    ----------
-    dt : `float`
-        a Unix timestamp
-
-    tzinfo : `datetime.tzinfo`, optional
-        the desired timezone for the output `datetime.datetime`
-
-    Returns
-    -------
-    datetime.datetime
-        the datetime that represents the given Unix epoch
-    """
-    return datetime.datetime.utcfromtimestamp(dt).replace(tzinfo=tzinfo)
 
 
 def submit_job(submit_description):

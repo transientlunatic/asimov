@@ -37,18 +37,6 @@ except ImportError:
 
 UTC = tz.tzutc()
 
-_HISTORY_CLASSADS = [
-    "CompletionDate",
-    "CpusProvisioned",
-    "GpusProvisioned",
-    "CumulativeSuspensionTime",
-    "EnteredCurrentStatus",
-    "MaxHosts",
-    "RemoteWallClockTime",
-    "RequestCpus",
-    "RequestGpus",
-]
-
 
 def _datetime_from_epoch(dt, tzinfo=UTC):
     """Return a :class:`datetime.datetime` for a given Unix epoch.
@@ -64,7 +52,7 @@ def _datetime_from_epoch(dt, tzinfo=UTC):
     -------
     datetime.datetime
     """
-    return datetime.datetime.utcfromtimestamp(dt).replace(tzinfo=tzinfo)
+    return datetime.datetime.fromtimestamp(dt, tz=datetime.timezone.utc).astimezone(tzinfo)
 
 
 class Scheduler(ABC):
@@ -212,7 +200,19 @@ class HTCondor(Scheduler):
     """
     Scheduler implementation for HTCondor.
     """
-    
+
+    _HISTORY_CLASSADS = [
+        "CompletionDate",
+        "CpusProvisioned",
+        "GpusProvisioned",
+        "CumulativeSuspensionTime",
+        "EnteredCurrentStatus",
+        "MaxHosts",
+        "RemoteWallClockTime",
+        "RequestCpus",
+        "RequestGpus",
+    ]
+
     def __init__(self, schedd_name=None):
         """
         Initialize the HTCondor scheduler.
@@ -550,7 +550,7 @@ class HTCondor(Scheduler):
 
         # First try the configured schedd
         try:
-            jobs = list(self.schedd.history(constraint, projection=_HISTORY_CLASSADS))
+            jobs = list(self.schedd.history(constraint, projection=self._HISTORY_CLASSADS))
         except Exception:
             jobs = []
 
@@ -564,7 +564,7 @@ class HTCondor(Scheduler):
             for collector in collectors:
                 try:
                     schedd = htcondor.Schedd(collector)
-                    jobs = list(schedd.history(constraint, projection=_HISTORY_CLASSADS))
+                    jobs = list(schedd.history(constraint, projection=self._HISTORY_CLASSADS))
                     if jobs:
                         break
                 except htcondor.HTCondorIOError:
@@ -575,29 +575,29 @@ class HTCondor(Scheduler):
                 f"No history found for cluster ID {cluster_id}"
             )
 
-        output = {}
-        for job in jobs:
-            end = float(job.get("CompletionDate", 0)) or float(
-                job.get("EnteredCurrentStatus", 0)
-            )
-            output["end"] = _datetime_from_epoch(end).strftime("%Y-%m-%d")
+        # For a DAG cluster there may be multiple subjob records; use the first
+        # one returned, which is the summary/parent record for the cluster.
+        job = jobs[0]
 
-            try:
-                cpus = float(job["CpusProvisioned"])
-            except (KeyError, ValueError):
-                cpus = float(job.get("RequestCpus", 1))
-            try:
-                gpus = float(job["GpusProvisioned"])
-            except (KeyError, ValueError):
-                gpus = float(job.get("RequestGpus", 0))
+        end = float(job.get("CompletionDate", 0)) or float(
+            job.get("EnteredCurrentStatus", 0)
+        )
+        end_str = _datetime_from_epoch(end).strftime("%Y-%m-%d") if end else ""
 
-            output["cpus"] = cpus
-            output["gpus"] = gpus
-            output["runtime"] = float(
-                job.get("RemoteWallClockTime", 0)
-            ) - float(job.get("CumulativeSuspensionTime", 0))
+        try:
+            cpus = float(job["CpusProvisioned"])
+        except (KeyError, ValueError):
+            cpus = float(job.get("RequestCpus", 1))
+        try:
+            gpus = float(job["GpusProvisioned"])
+        except (KeyError, ValueError):
+            gpus = float(job.get("RequestGpus", 0))
 
-        return output
+        runtime = float(job.get("RemoteWallClockTime", 0)) - float(
+            job.get("CumulativeSuspensionTime", 0)
+        )
+
+        return {"end": end_str, "cpus": cpus, "gpus": gpus, "runtime": runtime}
 
 
 class Slurm(Scheduler):

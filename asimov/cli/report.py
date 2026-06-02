@@ -1214,15 +1214,15 @@ def html(event, webdir):
             var cpus = analysisData.dataset.profilingCpus;
             var gpus = analysisData.dataset.profilingGpus;
             var profilingEnd = analysisData.dataset.profilingEnd;
+            function fmtSeconds(s) {
+                s = parseFloat(s);
+                if (isNaN(s)) return '-';
+                var h = Math.floor(s / 3600);
+                var m = Math.floor((s % 3600) / 60);
+                var sec = Math.floor(s % 60);
+                return h + 'h ' + m + 'm ' + sec + 's';
+            }
             if (runtime || cpus || gpus || profilingEnd) {
-                function fmtSeconds(s) {
-                    s = parseFloat(s);
-                    if (isNaN(s)) return '-';
-                    var h = Math.floor(s / 3600);
-                    var m = Math.floor((s % 3600) / 60);
-                    var sec = Math.floor(s % 60);
-                    return h + 'h ' + m + 'm ' + sec + 's';
-                }
                 document.getElementById('modal-profiling-runtime').textContent = runtime ? fmtSeconds(runtime) : '-';
                 if (runtime && cpus) {
                     document.getElementById('modal-profiling-cpu-time').textContent = fmtSeconds(parseFloat(runtime) * parseFloat(cpus));
