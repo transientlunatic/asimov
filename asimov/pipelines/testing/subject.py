@@ -180,7 +180,7 @@ class SubjectTestPipeline(Pipeline):
         """
         import subprocess
         import re
-        from asimov.scheduler import Slurm
+        from asimov.scheduler import LocalProcessScheduler, Slurm
 
         if not self.production.rundir:
             self.logger.warning("No run directory specified")
@@ -196,7 +196,18 @@ class SubjectTestPipeline(Pipeline):
         original_dir = os.getcwd()
         os.chdir(self.production.rundir)
         try:
-            if isinstance(self.scheduler, Slurm):
+            if isinstance(self.scheduler, LocalProcessScheduler):
+                job_script = os.path.join(self.production.rundir, "test_subject_job.sh")
+                job_id = self.scheduler.submit({
+                    "executable": "/bin/bash",
+                    "arguments": job_script,
+                    "output": os.path.join(self.production.rundir, "local_job.out"),
+                    "error": os.path.join(self.production.rundir, "local_job.err"),
+                    "name": f"test-subject/{self.production.event.name}/{self.production.name}",
+                })
+                self.logger.info(f"Local process job submitted: {job_id}")
+                return job_id
+            elif isinstance(self.scheduler, Slurm):
                 job_id = self.scheduler.submit("sbatch_submit.sh")
                 self.logger.info(f"Slurm job submitted: {job_id}")
                 return job_id

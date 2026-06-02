@@ -977,28 +977,6 @@ class LocalProcessScheduler(Scheduler):
         self._processes = {}  # pid -> {"process": Popen, "command": str, "name": str}
         self._lock = threading.Lock()
 
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
-
-    def _reap_completed(self):
-        """
-        Remove completed processes from the internal tracking dict.
-
-        This prevents the dict from growing without bound and avoids zombie
-        processes accumulating on platforms that require explicit reaping.
-        Called automatically at the start of :meth:`query` and
-        :meth:`submit`.
-        """
-        with self._lock:
-            done = [
-                pid
-                for pid, info in self._processes.items()
-                if info["process"].poll() is not None
-            ]
-            for pid in done:
-                del self._processes[pid]
-
     def wait_for_job(self, job_id):
         """
         Block until the process identified by *job_id* has exited.
@@ -1164,9 +1142,10 @@ class LocalProcessScheduler(Scheduler):
         Returns
         -------
         list of dict
-            Each dictionary contains ``id``, ``command``, ``hosts``, and
-            ``status`` keys compatible with :class:`JobList`.  Completed
-            processes are removed from internal tracking after being reported.
+            Each dictionary contains ``id``, ``command``, ``hosts``,
+            ``status``, and ``name`` keys compatible with :class:`JobList`.
+            Completed processes are removed from internal tracking after
+            being reported.
         """
         with self._lock:
             pids = [job_id] if job_id is not None else list(self._processes.keys())

@@ -166,7 +166,7 @@ class TestLocalProcessScheduler(unittest.TestCase):
 
     def test_submit_no_executable_raises(self):
         """submit() with no executable should raise RuntimeError."""
-        with self.assertRaises((RuntimeError, KeyError, TypeError)):
+        with self.assertRaises(RuntimeError):
             self.scheduler.submit({"arguments": "-c pass"})
 
     def test_stdout_written_to_file(self):
