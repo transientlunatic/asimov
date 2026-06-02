@@ -534,10 +534,11 @@ class Event:
             profiling = {}
             if hasattr(node, 'meta') and isinstance(node.meta, dict):
                 profiling = node.meta.get('profiling', {}) or {}
-            runtime = profiling.get('runtime', '')
-            cpus = profiling.get('cpus', '')
-            gpus = profiling.get('gpus', '')
-            end = profiling.get('end', '')
+            esc = lambda v: html.escape(str(v), quote=True)
+            runtime = esc(profiling.get('runtime', ''))
+            cpus = esc(profiling.get('cpus', ''))
+            gpus = esc(profiling.get('gpus', ''))
+            end = esc(profiling.get('end', ''))
             return (
                 f'data-profiling-runtime="{runtime}" '
                 f'data-profiling-cpus="{cpus}" '

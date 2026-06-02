@@ -1089,6 +1089,10 @@ class Slurm(Scheduler):
                 continue
         return data
 
+    def collect_history(self, cluster_id):
+        """Collect history for a Slurm job (not yet implemented)."""
+        raise NotImplementedError("Slurm history collection is not yet implemented")
+
 
 class LocalProcessScheduler(Scheduler):
     """
